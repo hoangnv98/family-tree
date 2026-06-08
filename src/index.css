@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* React Flow surface blends with our warm canvas */
+.react-flow {
+  background: transparent;
+}
+
+/* Hide React Flow attribution (allowed for the free tier when self-hosted) */
+.react-flow__attribution {
+  display: none;
+}
+
+/* Thin scrollbars in the editor drawer */
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(38, 37, 30, 0.2);
+  border-radius: 9999px;
+}
+.dark .scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
