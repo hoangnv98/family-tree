@@ -45,11 +45,21 @@ export function layoutTree(
     pos.set(p.id, { id: p.id, x: n.x - NODE_WIDTH / 2, y: n.y - NODE_HEIGHT / 2 });
   }
 
-  // Second pass: keep childless couples adjacent on the same row.
+  // Second pass: tidy childless couples — but never drag a spouse out of their
+  // own birth family. Only reposition a "married-in" spouse that has no parents
+  // of their own; if both partners belong to a family (cross-branch marriage)
+  // leave them in place and let the marriage line connect across.
   const childrenOf = (id: string) =>
     relationships
       .filter((r): r is ParentRelationship => r.type === 'parent' && r.parentId === id)
       .map((r) => r.childId);
+  const hasParents = (id: string) =>
+    relationships.some((r) => r.type === 'parent' && r.childId === id);
+
+  const placeBeside = (anchor: Positioned, moving: Positioned) => {
+    moving.y = anchor.y;
+    moving.x = anchor.x + NODE_WIDTH + 50;
+  };
 
   for (const r of relationships) {
     if (r.type !== 'spouse') continue;
@@ -57,10 +67,10 @@ export function layoutTree(
     const b = pos.get(r.bId);
     if (!a || !b) continue;
     const shareChild = childrenOf(r.aId).some((c) => childrenOf(r.bId).includes(c));
-    if (shareChild) continue; // dagre already grouped them
-    // Place b immediately to the right of a, same row.
-    b.y = a.y;
-    b.x = a.x + NODE_WIDTH + 50;
+    if (shareChild) continue; // dagre already grouped them via shared children
+    if (!hasParents(r.bId)) placeBeside(a, b);
+    else if (!hasParents(r.aId)) placeBeside(b, a);
+    // both rooted in their own family → don't move either one
   }
 
   return [...pos.values()];

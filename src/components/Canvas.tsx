@@ -58,6 +58,22 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
 
   const unions = useMemo(() => computeUnions(relationships), [relationships]);
 
+  // Parent-pairs that are an actual married couple (have a spouse link). Only
+  // these get a shared junction knot; other multi-parent children (con riêng)
+  // are drawn with separate dashed lines so they don't look like a couple.
+  const coupleKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of relationships) {
+      if (r.type === 'spouse') s.add([r.aId, r.bId].sort().join('+'));
+    }
+    return s;
+  }, [relationships]);
+
+  const isCoupleUnion = useCallback(
+    (parentIds: string[]) => parentIds.length === 2 && coupleKeys.has(parentIds.join('+')),
+    [coupleKeys],
+  );
+
   // Sync person nodes from people, preserving existing positions.
   useEffect(() => {
     setNodes((prev) => {
@@ -81,7 +97,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     const posById = new Map(nodes.map((n) => [n.id, n.position]));
     const out: Node[] = [];
     for (const u of unions) {
-      if (u.parentIds.length < 2) continue;
+      if (!isCoupleUnion(u.parentIds)) continue;
       const centers = u.parentIds
         .map((id) => posById.get(id))
         .filter((p): p is { x: number; y: number } => !!p)
@@ -100,7 +116,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       });
     }
     return out;
-  }, [unions, nodes]);
+  }, [unions, nodes, isCoupleUnion]);
 
   const allNodes = useMemo(() => [...nodes, ...junctionNodes], [nodes, junctionNodes]);
 
@@ -108,7 +124,8 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   useEffect(() => {
     const next: Edge[] = [];
 
-    // marriage lines
+    // marriage lines — soft bezier so cross-branch marriages curve nicely
+    // instead of cutting a hard diagonal across the canvas.
     for (const r of relationships) {
       if (r.type !== 'spouse') continue;
       next.push({
@@ -117,33 +134,55 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
         target: r.bId,
         sourceHandle: 'right',
         targetHandle: 'left',
-        type: 'straight',
+        type: 'default',
         selectable: true,
         style: { stroke: CRIMSON, strokeWidth: 2, strokeDasharray: '5 5' },
       });
     }
 
-    // parent → child, routed through the couple's junction when there are 2 parents
+    // parent → child links
     for (const u of unions) {
-      const couple = u.parentIds.length >= 2;
-      const source = couple ? u.id : u.parentIds[0];
-      const sourceHandle = couple ? 'jb' : 'bottom';
-      for (const childId of u.childIds) {
-        next.push({
-          id: `${u.id}__${childId}`,
-          source,
-          target: childId,
-          sourceHandle,
-          targetHandle: 'top',
-          type: 'smoothstep',
-          pathOptions: { borderRadius: 16 },
-          style: { stroke: ORANGE, strokeWidth: 2 },
-        } as Edge);
+      if (isCoupleUnion(u.parentIds)) {
+        // real couple: one shared line from the junction knot to every child
+        for (const childId of u.childIds) {
+          next.push({
+            id: `${u.id}__${childId}`,
+            source: u.id,
+            target: childId,
+            sourceHandle: 'jb',
+            targetHandle: 'top',
+            type: 'smoothstep',
+            pathOptions: { borderRadius: 16 },
+            style: { stroke: ORANGE, strokeWidth: 2 },
+          } as Edge);
+        }
+      } else {
+        // single parent (solid) or con riêng / non-couple parents (dashed):
+        // a separate line straight from each parent to each child.
+        const dashed = u.parentIds.length >= 2;
+        for (const parentId of u.parentIds) {
+          for (const childId of u.childIds) {
+            next.push({
+              id: `${parentId}__${childId}`,
+              source: parentId,
+              target: childId,
+              sourceHandle: 'bottom',
+              targetHandle: 'top',
+              type: 'smoothstep',
+              pathOptions: { borderRadius: 16 },
+              style: {
+                stroke: ORANGE,
+                strokeWidth: 2,
+                ...(dashed ? { strokeDasharray: '6 5', opacity: 0.85 } : {}),
+              },
+            } as Edge);
+          }
+        }
       }
     }
 
     setEdges(next);
-  }, [relationships, unions, setEdges]);
+  }, [relationships, unions, isCoupleUnion, setEdges]);
 
   const doLayout = useCallback(() => {
     const positioned = layoutTree(people, relationships);
@@ -244,20 +283,26 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   const onEdgesDelete = useCallback(
     (deleted: Edge[]) =>
       deleted.forEach((e) => {
-        const sep = e.id.indexOf('__');
-        if (sep === -1) {
-          // marriage line — edge id is the spouse relationship id
-          removeRelationship(e.id);
+        if (e.source.startsWith('u_')) {
+          // couple junction → child: detach the child from both parents
+          const parentIds = e.source.slice(2).split('+');
+          relationships.forEach((r) => {
+            if (r.type === 'parent' && r.childId === e.target && parentIds.includes(r.parentId)) {
+              removeRelationship(r.id);
+            }
+          });
           return;
         }
-        // union → child line: detach the child from all of that couple's parents
-        const childId = e.target;
-        const parentIds = e.source.startsWith('u_') ? e.source.slice(2).split('+') : [e.source];
-        relationships.forEach((r) => {
-          if (r.type === 'parent' && r.childId === childId && parentIds.includes(r.parentId)) {
-            removeRelationship(r.id);
-          }
-        });
+        // direct parent → child line
+        const parentRel = relationships.find(
+          (r) => r.type === 'parent' && r.parentId === e.source && r.childId === e.target,
+        );
+        if (parentRel) {
+          removeRelationship(parentRel.id);
+          return;
+        }
+        // otherwise it's a marriage line — edge id is the spouse relationship id
+        removeRelationship(e.id);
       }),
     [removeRelationship, relationships],
   );
