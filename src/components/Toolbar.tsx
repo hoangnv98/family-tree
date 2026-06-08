@@ -158,7 +158,18 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
             {menu && (
               <>
                 <div className="fixed inset-0 z-0" onClick={() => setMenu(false)} />
-                <div className="absolute right-0 top-11 z-10 w-52 overflow-hidden rounded-brand border border-ink/10 bg-canvas py-1 shadow-float dark:border-white/10 dark:bg-surface-500">
+                <div className="absolute right-0 top-11 z-10 w-60 overflow-hidden rounded-brand border border-ink/10 bg-canvas py-1 shadow-float dark:border-white/10 dark:bg-surface-500">
+                  <button
+                    onClick={() => {
+                      requestLayout();
+                      setMenu(false);
+                      flash('ok', 'Đã căn lại sơ đồ về hàng ngay ngắn.');
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink/80 hover:bg-surface-300 dark:text-white/80 dark:hover:bg-white/10"
+                  >
+                    <LayoutGrid className="h-4 w-4" /> Căn lại sơ đồ (hàng đẹp)
+                  </button>
+                  <div className="my-1 h-px bg-ink/10 dark:bg-white/10" />
                   <button
                     onClick={() => {
                       resetToSample();

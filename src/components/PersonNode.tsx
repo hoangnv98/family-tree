@@ -21,6 +21,10 @@ const genderBar: Record<Person['gender'], string> = {
   other: 'bg-ink/40 dark:bg-white/40',
 };
 
+// Handles stay invisible until the card is hovered (or being connected to).
+const handleCls = (color: string) =>
+  `!h-2 !w-2 ${color} !opacity-0 transition-opacity group-hover:!opacity-100`;
+
 function PersonNodeComponent({ data, selected }: NodeProps) {
   const { person, dimmed } = data as PersonNodeData;
   const span = lifespan(person);
@@ -65,11 +69,13 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
         )}
       </div>
 
-      {/* connection handles — top/bottom = parent↓child, left/right = spouse */}
-      <Handle id="top" type="target" position={Position.Top} className="!h-2 !w-2 !bg-accent/70" />
-      <Handle id="bottom" type="source" position={Position.Bottom} className="!h-2 !w-2 !bg-accent/70" />
-      <Handle id="left" type="target" position={Position.Left} className="!h-2 !w-2 !bg-female/70" />
-      <Handle id="right" type="source" position={Position.Right} className="!h-2 !w-2 !bg-female/70" />
+      {/* connection handles — top/bottom = parent↓child, left/right = spouse.
+          Hidden until the card is hovered so deleted links don't leave stray
+          dots that look like leftover connections. */}
+      <Handle id="top" type="target" position={Position.Top} className={handleCls('!bg-accent/70')} />
+      <Handle id="bottom" type="source" position={Position.Bottom} className={handleCls('!bg-accent/70')} />
+      <Handle id="left" type="target" position={Position.Left} className={handleCls('!bg-female/70')} />
+      <Handle id="right" type="source" position={Position.Right} className={handleCls('!bg-female/70')} />
     </div>
   );
 }
