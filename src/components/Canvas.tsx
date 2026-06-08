@@ -9,17 +9,25 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  getNodesBounds,
+  getViewportForBounds,
   type Node,
   type Edge,
   type Connection,
   type NodeMouseHandler,
 } from '@xyflow/react';
+import { toPng } from 'html-to-image';
 import { useTreeStore } from '../store/treeStore';
-import { layoutTree } from '../lib/layout';
+import { layoutTree, NODE_WIDTH, NODE_HEIGHT } from '../lib/layout';
+import { computeUnions } from '../lib/unions';
 import { PersonNode, type PersonNodeData } from './PersonNode';
+import { JunctionNode, JUNCTION_SIZE } from './JunctionNode';
 import { fullName, type Person } from '../types';
 
-const nodeTypes = { person: PersonNode };
+const nodeTypes = { person: PersonNode, junction: JunctionNode };
+
+const ORANGE = '#f54e00';
+const CRIMSON = '#cf2d56';
 
 function matches(p: Person, q: string): boolean {
   const needle = q.trim().toLowerCase();
@@ -38,16 +46,19 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   const search = useTreeStore((s) => s.search);
   const dark = useTreeStore((s) => s.dark);
   const layoutTick = useTreeStore((s) => s.layoutTick);
+  const pngTick = useTreeStore((s) => s.pngTick);
   const setSelected = useTreeStore((s) => s.setSelected);
   const addRelationship = useTreeStore((s) => s.addRelationship);
   const removeRelationship = useTreeStore((s) => s.removeRelationship);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<PersonNodeData>>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const { fitView } = useReactFlow();
+  const { fitView, getNodes } = useReactFlow();
   const didInit = useRef(false);
 
-  // Sync nodes from people, preserving existing positions.
+  const unions = useMemo(() => computeUnions(relationships), [relationships]);
+
+  // Sync person nodes from people, preserving existing positions.
   useEffect(() => {
     setNodes((prev) => {
       const byId = new Map(prev.map((n) => [n.id, n]));
@@ -64,31 +75,75 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     });
   }, [people, search, selectedId, setNodes]);
 
-  // Sync edges from relationships.
+  // Derive junction "knot" nodes from the live person positions (one per couple
+  // with children). They are not stored in state — they follow the parents.
+  const junctionNodes = useMemo<Node[]>(() => {
+    const posById = new Map(nodes.map((n) => [n.id, n.position]));
+    const out: Node[] = [];
+    for (const u of unions) {
+      if (u.parentIds.length < 2) continue;
+      const centers = u.parentIds
+        .map((id) => posById.get(id))
+        .filter((p): p is { x: number; y: number } => !!p)
+        .map((p) => ({ x: p.x + NODE_WIDTH / 2, y: p.y + NODE_HEIGHT / 2 }));
+      if (centers.length < 2) continue;
+      const cx = centers.reduce((s, c) => s + c.x, 0) / centers.length;
+      const cy = centers.reduce((s, c) => s + c.y, 0) / centers.length;
+      out.push({
+        id: u.id,
+        type: 'junction',
+        position: { x: cx - JUNCTION_SIZE / 2, y: cy - JUNCTION_SIZE / 2 },
+        data: {},
+        draggable: false,
+        selectable: false,
+        deletable: false,
+      });
+    }
+    return out;
+  }, [unions, nodes]);
+
+  const allNodes = useMemo(() => [...nodes, ...junctionNodes], [nodes, junctionNodes]);
+
+  // Build edges: marriage lines (spouse) + one shared line per union to children.
   useEffect(() => {
-    const next: Edge[] = relationships.map((r) =>
-      r.type === 'parent'
-        ? {
-            id: r.id,
-            source: r.parentId,
-            target: r.childId,
-            sourceHandle: 'bottom',
-            targetHandle: 'top',
-            type: 'smoothstep',
-            style: { stroke: '#f54e00', strokeWidth: 2 },
-          }
-        : {
-            id: r.id,
-            source: r.aId,
-            target: r.bId,
-            sourceHandle: 'right',
-            targetHandle: 'left',
-            type: 'straight',
-            style: { stroke: '#cf2d56', strokeWidth: 2, strokeDasharray: '5 5' },
-          },
-    );
+    const next: Edge[] = [];
+
+    // marriage lines
+    for (const r of relationships) {
+      if (r.type !== 'spouse') continue;
+      next.push({
+        id: r.id,
+        source: r.aId,
+        target: r.bId,
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        type: 'straight',
+        selectable: true,
+        style: { stroke: CRIMSON, strokeWidth: 2, strokeDasharray: '5 5' },
+      });
+    }
+
+    // parent → child, routed through the couple's junction when there are 2 parents
+    for (const u of unions) {
+      const couple = u.parentIds.length >= 2;
+      const source = couple ? u.id : u.parentIds[0];
+      const sourceHandle = couple ? 'jb' : 'bottom';
+      for (const childId of u.childIds) {
+        next.push({
+          id: `${u.id}__${childId}`,
+          source,
+          target: childId,
+          sourceHandle,
+          targetHandle: 'top',
+          type: 'smoothstep',
+          pathOptions: { borderRadius: 16 },
+          style: { stroke: ORANGE, strokeWidth: 2 },
+        } as Edge);
+      }
+    }
+
     setEdges(next);
-  }, [relationships, setEdges]);
+  }, [relationships, unions, setEdges]);
 
   const doLayout = useCallback(() => {
     const positioned = layoutTree(people, relationships);
@@ -113,9 +168,68 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutTick]);
 
+  // Export the whole tree as a PNG when the toolbar requests it.
+  useEffect(() => {
+    if (pngTick === 0) return;
+    const viewportEl = document.querySelector('.react-flow__viewport') as HTMLElement | null;
+    if (!viewportEl) return;
+    const bounds = getNodesBounds(getNodes());
+    if (!bounds.width || !bounds.height) return;
+    const imageWidth = Math.max(Math.round(bounds.width) + 200, 600);
+    const imageHeight = Math.max(Math.round(bounds.height) + 200, 400);
+    const t = getViewportForBounds(bounds, imageWidth, imageHeight, 0.5, 2, 0.12);
+
+    // React Flow's edge <svg> is 0×0 with overflow:visible, so html-to-image
+    // would clip every edge away. Give it explicit dimensions covering the
+    // content for the duration of the capture, then restore.
+    const svgW = Math.ceil(bounds.x + bounds.width + 200);
+    const svgH = Math.ceil(bounds.y + bounds.height + 200);
+    const edgeSvgs = Array.from(
+      viewportEl.querySelectorAll<SVGElement>('.react-flow__edges'),
+    );
+    const restore = edgeSvgs.map((svg) => {
+      const prev = { w: svg.style.width, h: svg.style.height };
+      svg.style.width = `${svgW}px`;
+      svg.style.height = `${svgH}px`;
+      return () => {
+        svg.style.width = prev.w;
+        svg.style.height = prev.h;
+      };
+    });
+    const cleanup = () => restore.forEach((fn) => fn());
+
+    toPng(viewportEl, {
+      backgroundColor: dark ? '#1c1b16' : '#f2f1ed',
+      width: imageWidth,
+      height: imageHeight,
+      pixelRatio: 2,
+      cacheBust: true,
+      style: {
+        width: `${imageWidth}px`,
+        height: `${imageHeight}px`,
+        transform: `translate(${t.x}px, ${t.y}px) scale(${t.zoom})`,
+      },
+    })
+      .then((dataUrl) => {
+        cleanup();
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = 'cay-gia-pha.png';
+        a.click();
+      })
+      .catch((err) => {
+        cleanup();
+        console.error('PNG export failed', err);
+        alert('Không tạo được ảnh PNG. Thử lại nhé.');
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pngTick]);
+
   const onConnect = useCallback(
     (c: Connection) => {
       if (!c.source || !c.target || c.source === c.target) return;
+      // ignore connections involving junction nodes
+      if (c.source.startsWith('u_') || c.target.startsWith('u_')) return;
       const spouse =
         c.sourceHandle === 'right' ||
         c.sourceHandle === 'left' ||
@@ -128,12 +242,29 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   );
 
   const onEdgesDelete = useCallback(
-    (deleted: Edge[]) => deleted.forEach((e) => removeRelationship(e.id)),
-    [removeRelationship],
+    (deleted: Edge[]) =>
+      deleted.forEach((e) => {
+        const sep = e.id.indexOf('__');
+        if (sep === -1) {
+          // marriage line — edge id is the spouse relationship id
+          removeRelationship(e.id);
+          return;
+        }
+        // union → child line: detach the child from all of that couple's parents
+        const childId = e.target;
+        const parentIds = e.source.startsWith('u_') ? e.source.slice(2).split('+') : [e.source];
+        relationships.forEach((r) => {
+          if (r.type === 'parent' && r.childId === childId && parentIds.includes(r.parentId)) {
+            removeRelationship(r.id);
+          }
+        });
+      }),
+    [removeRelationship, relationships],
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
+      if (node.type !== 'person') return;
       setSelected(node.id);
       onEdit(node.id);
     },
@@ -147,7 +278,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
 
   return (
     <ReactFlow
-      nodes={nodes}
+      nodes={allNodes}
       edges={edges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
@@ -168,6 +299,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
         pannable
         zoomable
         nodeColor={(n) => {
+          if (n.type === 'junction') return ORANGE;
           const g = (n.data as PersonNodeData)?.person?.gender;
           return g === 'male' ? '#4f86c6' : g === 'female' ? '#cf6d8a' : '#9b9890';
         }}

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import {
   UserPlus,
   Download,
+  ImageDown,
   Upload,
   LayoutGrid,
   Search,
@@ -48,6 +49,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   const setSearch = useTreeStore((s) => s.setSearch);
   const toggleDark = useTreeStore((s) => s.toggleDark);
   const requestLayout = useTreeStore((s) => s.requestLayout);
+  const requestPng = useTreeStore((s) => s.requestPng);
   const addPerson = useTreeStore((s) => s.addPerson);
   const loadFile = useTreeStore((s) => s.loadFile);
   const resetToSample = useTreeStore((s) => s.resetToSample);
@@ -134,6 +136,15 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
           </IconButton>
           <IconButton onClick={onExport} title="Xuất JSON">
             <Download className="h-5 w-5" />
+          </IconButton>
+          <IconButton
+            onClick={() => {
+              requestPng();
+              flash('ok', 'Đang tạo ảnh PNG…');
+            }}
+            title="Xuất ảnh PNG"
+          >
+            <ImageDown className="h-5 w-5" />
           </IconButton>
           <IconButton onClick={toggleDark} title={dark ? 'Chế độ sáng' : 'Chế độ tối'}>
             {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

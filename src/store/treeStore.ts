@@ -11,12 +11,14 @@ interface TreeState {
   search: string;
   dark: boolean;
   layoutTick: number;
+  pngTick: number;
 
   // selection / ui
   setSelected: (id: string | null) => void;
   setSearch: (q: string) => void;
   toggleDark: () => void;
   requestLayout: () => void;
+  requestPng: () => void;
 
   // person CRUD
   addPerson: (partial?: Partial<Person>) => string;
@@ -66,11 +68,13 @@ export const useTreeStore = create<TreeState>()(
       search: '',
       dark: false,
       layoutTick: 0,
+      pngTick: 0,
 
       setSelected: (id) => set({ selectedId: id }),
       setSearch: (q) => set({ search: q }),
       toggleDark: () => set((s) => ({ dark: !s.dark })),
       requestLayout: () => set((s) => ({ layoutTick: s.layoutTick + 1 })),
+      requestPng: () => set((s) => ({ pngTick: s.pngTick + 1 })),
 
       addPerson: (partial) => {
         const person = newPerson(partial);
