@@ -79,6 +79,8 @@ export function fullName(p: Person): string {
 }
 
 export function lifespan(p: Person): string {
-  if (!p.birthYear && !p.deathYear) return '';
-  return `${p.birthYear ?? '?'} – ${p.deathYear ?? ''}`.trim();
+  if (p.birthYear && p.deathYear) return `${p.birthYear} – ${p.deathYear}`;
+  if (p.birthYear) return `${p.birthYear}`;
+  if (p.deathYear) return `– ${p.deathYear}`;
+  return '';
 }
