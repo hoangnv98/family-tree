@@ -32,10 +32,13 @@ export function computeKinship(
     }
   }
   const gender = (id: string) => byId.get(id)?.gender;
-  const year = (id: string) => byId.get(id)?.birthYear;
+  // Seniority between siblings: manual birth order first (1 = con cả), then year.
   const older = (a: string, b: string) => {
-    const ya = year(a);
-    const yb = year(b);
+    const oa = byId.get(a)?.birthOrder;
+    const ob = byId.get(b)?.birthOrder;
+    if (oa != null && ob != null) return oa < ob;
+    const ya = byId.get(a)?.birthYear;
+    const yb = byId.get(b)?.birthYear;
     return ya != null && yb != null ? ya < yb : false;
   };
   const siblingsOf = (id: string) => {

@@ -22,6 +22,8 @@ export const personSchema = z.object({
   firstName: z.string(),
   lastName: z.string().default(''),
   gender: z.enum(GENDERS).default('other'),
+  /** Thứ tự con trong nhà (1 = con cả). Dùng để xếp anh/chị/em khi thiếu năm sinh. */
+  birthOrder: z.number().optional(),
   birthYear: z.number().optional(),
   deathYear: z.number().optional(),
   photo: z.string().optional(),

@@ -303,6 +303,18 @@ export function PersonDrawer({
                   }
                 />
               </Field>
+              <Field label="Thứ tự con (1 = con cả)">
+                <input
+                  type="number"
+                  min={1}
+                  className={inputCls}
+                  placeholder="vd 1, 2, 3…"
+                  value={person.birthOrder ?? ''}
+                  onChange={(e) =>
+                    set({ birthOrder: e.target.value ? Number(e.target.value) : undefined })
+                  }
+                />
+              </Field>
             </div>
 
             {/* Quan hệ */}
