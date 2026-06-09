@@ -14,10 +14,11 @@ export interface Positioned {
   y: number;
 }
 
-const H_GAP = 40; // gap between sibling subtrees
-const COUPLE_GAP = 36; // gap between a person and the spouse beside them
-const RANK_GAP = 80; // vertical gap between generations
-const FAMILY_GAP = 120; // gap between separate root families
+const H_GAP = 60; // gap between sibling subtrees
+const COUPLE_GAP = 44; // gap between a person and the spouse beside them
+const RANK_GAP = 90; // vertical gap between generations
+const FAMILY_GAP = 140; // gap between separate root families
+const MIN_GAP = 24; // hard minimum gap enforced between any two cards on a row
 
 /**
  * Tidy-tree auto-layout. A "unit" is a blood person plus the spouse(s) shown
@@ -190,6 +191,22 @@ export function layoutTree(
   };
   for (const id of roots) placeRoot(id);
   for (const p of people) placeRoot(p.id); // leftover / disconnected roots
+
+  // Safety net: guarantee no two cards on the same row overlap. The tidy layout
+  // shouldn't produce overlaps, so this is a no-op in normal trees, but it keeps
+  // any odd structure (and re-centred couples) from ever touching.
+  const rows = new Map<number, Positioned[]>();
+  for (const p of pos.values()) {
+    const key = Math.round(p.y);
+    rows.set(key, [...(rows.get(key) ?? []), p]);
+  }
+  for (const row of rows.values()) {
+    row.sort((a, b) => a.x - b.x);
+    for (let i = 1; i < row.length; i++) {
+      const minX = row[i - 1].x + wOf(row[i - 1].id) + MIN_GAP;
+      if (row[i].x < minX) row[i].x = minX;
+    }
+  }
 
   return [...pos.values()];
 }
