@@ -25,6 +25,7 @@ export function layoutTreeVertical(
   const spouseOf = new Map<string, string[]>();
   const parentsOf = new Map<string, string[]>();
   const childrenOf = new Map<string, string[]>();
+  const genderOf = new Map(people.map((p) => [p.id, p.gender]));
   const push = (m: Map<string, string[]>, k: string, v: string) =>
     m.set(k, [...(m.get(k) ?? []), v]);
 
@@ -50,6 +51,14 @@ export function layoutTreeVertical(
     return ss.find((s) => !(parentsOf.get(s)?.length)) ?? ss[0];
   };
 
+  // Order a couple so the husband (male) sits on the left, wife on the right.
+  // `id` is the blood line; children still indent under the left slot.
+  const orderCouple = (id: string, sp?: string): [string, string | undefined] => {
+    if (!sp) return [id, undefined];
+    if (genderOf.get(sp) === 'male' && genderOf.get(id) !== 'male') return [sp, id];
+    return [id, sp];
+  };
+
   // Children of the family unit (this person + the spouse shown beside them).
   const unitChildren = (id: string, spouseId?: string): string[] => {
     const ids = [...(childrenOf.get(id) ?? [])];
@@ -62,14 +71,15 @@ export function layoutTreeVertical(
   function place(id: string, x: number, y: number): { bottom: number; right: number } {
     if (placed.has(id)) return { bottom: y + NODE_HEIGHT, right: x + NODE_WIDTH };
     placed.add(id);
-    pos.set(id, { id, x, y });
+    const sp = besideSpouse(id);
+    const [leftId, rightId] = orderCouple(id, sp);
+    pos.set(leftId, { id: leftId, x, y });
     let right = x + NODE_WIDTH;
 
-    const sp = besideSpouse(id);
-    if (sp) {
+    if (sp && rightId) {
       placed.add(sp);
       const sx = x + NODE_WIDTH + COUPLE_GAP;
-      pos.set(sp, { id: sp, x: sx, y });
+      pos.set(rightId, { id: rightId, x: sx, y });
       right = sx + NODE_WIDTH;
     }
 
@@ -87,14 +97,15 @@ export function layoutTreeVertical(
   // each column holding that child's indented vertical subtree (gen ≥ 3).
   function placeFamily(headId: string, startX: number): number {
     placed.add(headId);
-    pos.set(headId, { id: headId, x: startX, y: 0 });
+    const sp = besideSpouse(headId);
+    const [leftId, rightId] = orderCouple(headId, sp);
+    pos.set(leftId, { id: leftId, x: startX, y: 0 });
     let right = startX + NODE_WIDTH;
 
-    const sp = besideSpouse(headId);
-    if (sp) {
+    if (sp && rightId) {
       placed.add(sp);
       const sx = startX + NODE_WIDTH + COUPLE_GAP;
-      pos.set(sp, { id: sp, x: sx, y: 0 });
+      pos.set(rightId, { id: rightId, x: sx, y: 0 });
       right = sx + NODE_WIDTH;
     }
 

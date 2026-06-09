@@ -64,5 +64,23 @@ export function layoutTree(
     mover.y = anchor.y;
   }
 
+  // Final pass: within each married couple keep the husband on the left and the
+  // wife on the right (swap their x if needed) so the marriage line reads a
+  // clean left→right and the cards never overlap.
+  const genderOf = new Map(people.map((p) => [p.id, p.gender]));
+  for (const r of relationships) {
+    if (r.type !== 'spouse') continue;
+    const a = pos.get(r.aId);
+    const b = pos.get(r.bId);
+    if (!a || !b || Math.abs(a.y - b.y) > 1) continue; // only same-row couples
+    const ga = genderOf.get(r.aId);
+    const gb = genderOf.get(r.bId);
+    let male, female;
+    if (ga === 'male' && gb !== 'male') [male, female] = [a, b];
+    else if (gb === 'male' && ga !== 'male') [male, female] = [b, a];
+    else continue; // can't tell (same gender / unknown) → leave as is
+    if (male.x > female.x) [male.x, female.x] = [female.x, male.x];
+  }
+
   return [...pos.values()];
 }

@@ -72,6 +72,11 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   // gender at render time.
   const inLaw = useMemo(() => marriedInIds(relationships), [relationships]);
 
+  const genderOf = useMemo(
+    () => new Map(people.map((p) => [p.id, p.gender])),
+    [people],
+  );
+
   // Parent-pairs that are an actual married couple (have a spouse link). Only
   // these get a shared junction knot; other multi-parent children (con riêng)
   // are drawn with separate dashed lines so they don't look like a couple.
@@ -165,15 +170,26 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   useEffect(() => {
     const next: Edge[] = [];
 
-    // marriage lines — soft bezier. For a relocated couple, force anchor → mover
-    // direction so the line is a clean short connector between adjacent cards.
+    // marriage lines — soft bezier, always drawn left→right (husband's right
+    // handle → wife's left handle) so the line is a clean short connector and
+    // never crosses over. The husband (male) is the left source; if gender can't
+    // decide (same-gender / unknown) we fall back to the relocation direction.
     for (const r of relationships) {
       if (r.type !== 'spouse') continue;
-      const rel = relocatedPair.get([r.aId, r.bId].sort().join('+'));
+      const aMale = genderOf.get(r.aId) === 'male';
+      const bMale = genderOf.get(r.bId) === 'male';
+      let source = r.aId;
+      let target = r.bId;
+      if (aMale !== bMale) {
+        if (bMale) [source, target] = [r.bId, r.aId]; // male on the left
+      } else {
+        const rel = relocatedPair.get([r.aId, r.bId].sort().join('+'));
+        if (rel) [source, target] = [rel.anchor, rel.mover];
+      }
       next.push({
         id: r.id,
-        source: rel ? rel.anchor : r.aId,
-        target: rel ? rel.mover : r.bId,
+        source,
+        target,
         sourceHandle: 'right',
         targetHandle: 'left',
         type: 'default',
@@ -232,7 +248,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     }
 
     setEdges(next);
-  }, [relationships, unions, isCoupleUnion, moverIds, relocatedPair, setEdges]);
+  }, [relationships, unions, isCoupleUnion, moverIds, relocatedPair, genderOf, setEdges]);
 
   const doLayout = useCallback(() => {
     const positioned =
