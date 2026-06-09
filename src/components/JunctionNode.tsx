@@ -11,7 +11,7 @@ export const JUNCTION_SIZE = 12;
 function JunctionNodeComponent() {
   return (
     <div
-      className="rounded-full bg-accent ring-2 ring-canvas dark:ring-surface-500"
+      className="rounded-full bg-accent ring-2 ring-canvas dark:ring-[#14130d]"
       style={{ width: JUNCTION_SIZE, height: JUNCTION_SIZE }}
     >
       <Handle id="jt" type="target" position={Position.Top} className="!opacity-0" />

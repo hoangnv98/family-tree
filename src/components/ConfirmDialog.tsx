@@ -26,7 +26,7 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm rounded-brand border border-ink/10 bg-white p-5 shadow-card dark:border-white/10 dark:bg-surface-500"
+        className="w-full max-w-sm rounded-brand border border-ink/10 bg-white p-5 shadow-card dark:border-white/10 dark:bg-[#1b1a14]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center gap-3">

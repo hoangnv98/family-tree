@@ -36,7 +36,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-ink/10 bg-surface-100 px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-surface-400 dark:text-white';
+  'w-full rounded-lg border border-ink/10 bg-surface-100 px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-[#2b2a23] dark:text-white';
 
 function SectionTitle({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
@@ -95,7 +95,7 @@ function AddRelation({
 
 function RelationRow({ name, onRemove }: { name: string; onRemove: () => void }) {
   return (
-    <div className="flex items-center justify-between rounded-lg bg-surface-200 px-3 py-1.5 text-sm text-ink dark:bg-surface-400 dark:text-white">
+    <div className="flex items-center justify-between rounded-lg bg-surface-200 px-3 py-1.5 text-sm text-ink dark:bg-[#2b2a23] dark:text-white">
       <span className="truncate">{name}</span>
       <button
         onClick={onRemove}
@@ -173,7 +173,7 @@ export function PersonDrawer({
 
   return (
     <aside
-      className={`fixed right-0 top-0 z-40 flex h-full w-full max-w-md flex-col border-l border-ink/10 bg-canvas shadow-float transition-transform duration-300 dark:border-white/10 dark:bg-surface-500 ${
+      className={`fixed right-0 top-0 z-40 flex h-full w-full max-w-md flex-col border-l border-ink/10 bg-canvas shadow-float transition-transform duration-300 dark:border-white/10 dark:bg-[#1b1a14] ${
         open ? 'translate-x-0' : 'translate-x-full'
       }`}
     >
@@ -214,7 +214,7 @@ export function PersonDrawer({
             {/* avatar */}
             <div className="mt-5 flex items-center gap-4">
               <div className="relative">
-                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-surface-300 ring-2 ring-ink/10 dark:bg-surface-400 dark:ring-white/10">
+                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-surface-300 ring-2 ring-ink/10 dark:bg-[#2b2a23] dark:ring-white/10">
                   {person.photo ? (
                     <img src={person.photo} alt="" className="h-full w-full object-cover" />
                   ) : (
@@ -412,7 +412,7 @@ export function PersonDrawer({
               {(person.events ?? []).map((ev) => (
                 <div
                   key={ev.id}
-                  className="rounded-lg border border-ink/10 bg-surface-100 p-3 dark:border-white/10 dark:bg-surface-400"
+                  className="rounded-lg border border-ink/10 bg-surface-100 p-3 dark:border-white/10 dark:bg-[#2b2a23]"
                 >
                   <div className="mb-2 flex gap-2">
                     <input

@@ -54,7 +54,7 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
 
       {/* avatar */}
       <div
-        className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-300 ring-2 ${genderRing[person.gender]} dark:bg-surface-400`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-300 ring-2 ${genderRing[person.gender]} dark:bg-[#3a3930]`}
       >
         {person.photo ? (
           <img src={person.photo} alt="" className="h-full w-full object-cover" />

@@ -155,7 +155,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   return (
     <>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center p-4">
-        <div className="pointer-events-auto flex w-full max-w-4xl items-center gap-2 rounded-brand border border-ink/10 bg-canvas/80 px-3 py-2 shadow-float backdrop-blur-md dark:border-white/10 dark:bg-surface-500/80">
+        <div className="pointer-events-auto flex w-full max-w-4xl items-center gap-2 rounded-brand border border-ink/10 bg-canvas/80 px-3 py-2 shadow-float backdrop-blur-md dark:border-white/10 dark:bg-[#1b1a14]/85">
           {/* brand */}
           <div className="flex items-center gap-2 pl-1 pr-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">
@@ -171,7 +171,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
               className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
                 cloudSave === 'error'
                   ? 'bg-crimson/10 text-crimson'
-                  : 'bg-surface-200 text-ink/60 dark:bg-surface-400 dark:text-white/60'
+                  : 'bg-surface-200 text-ink/60 dark:bg-[#2b2a23] dark:text-white/60'
               }`}
               title="Tự lưu lên cloud — ai có link cũng sửa được"
             >
@@ -185,7 +185,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
           {/* primary add — a "view-only" badge when locked (cloud store is off) */}
           {readOnly ? (
             <span
-              className="flex items-center gap-1.5 rounded-lg bg-surface-200 px-3 py-2 text-sm font-medium text-ink/60 dark:bg-surface-400 dark:text-white/60"
+              className="flex items-center gap-1.5 rounded-lg bg-surface-200 px-3 py-2 text-sm font-medium text-ink/60 dark:bg-[#2b2a23] dark:text-white/60"
               title="Cây chia sẻ ở chế độ chỉ xem (chưa bật lưu trữ đám mây)"
             >
               <Lock className="h-4 w-4" />
@@ -208,7 +208,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm theo tên, nghề, nơi sinh…"
-              className="w-full rounded-lg border border-ink/10 bg-surface-100 py-2 pl-8 pr-7 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-surface-400 dark:text-white"
+              className="w-full rounded-lg border border-ink/10 bg-surface-100 py-2 pl-8 pr-7 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-[#2b2a23] dark:text-white"
             />
             {search && (
               <button
@@ -270,7 +270,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
             {menu && (
               <>
                 <div className="fixed inset-0 z-0" onClick={() => setMenu(false)} />
-                <div className="absolute right-0 top-11 z-10 w-60 overflow-hidden rounded-brand border border-ink/10 bg-canvas py-1 shadow-float dark:border-white/10 dark:bg-surface-500">
+                <div className="absolute right-0 top-11 z-10 w-60 overflow-hidden rounded-brand border border-ink/10 bg-canvas py-1 shadow-float dark:border-white/10 dark:bg-[#1b1a14]">
                   <button
                     onClick={() => {
                       requestLayout();
