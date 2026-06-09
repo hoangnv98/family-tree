@@ -1,6 +1,6 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { User, Plus, Heart } from 'lucide-react';
+import { User, Plus, Heart, MoreVertical, Baby, Pencil, Trash2 } from 'lucide-react';
 import { fullName, lifespan, type Person } from '../types';
 
 export interface PersonNodeData {
@@ -12,6 +12,8 @@ export interface PersonNodeData {
   /** Quick-add actions shown on hover (omitted in read-only view). */
   addChild?: (id: string) => void;
   addSpouse?: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
   [key: string]: unknown;
 }
 
@@ -32,8 +34,10 @@ const handleCls = (color: string) =>
   `!h-2 !w-2 ${color} !opacity-0 transition-opacity group-hover:!opacity-100`;
 
 function PersonNodeComponent({ data, selected }: NodeProps) {
-  const { person, dimmed, readOnly, inLawRole, addChild, addSpouse } = data as PersonNodeData;
+  const { person, dimmed, readOnly, inLawRole, addChild, addSpouse, onEdit, onDelete } =
+    data as PersonNodeData;
   const span = lifespan(person);
+  const [menu, setMenu] = useState(false);
 
   return (
     <div
@@ -127,6 +131,62 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
               <Heart className="h-4 w-4" />
             </button>
           </div>
+
+          {/* "..." options menu (top-right, on hover / when open) */}
+          <button
+            title="Tùy chọn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenu((v) => !v);
+            }}
+            className={`nodrag absolute right-1.5 top-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-md text-ink/40 transition hover:bg-ink/10 dark:text-white/50 dark:hover:bg-white/10 ${
+              menu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`}
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+          {menu && (
+            <>
+              <div
+                className="fixed inset-0 z-20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenu(false);
+                }}
+              />
+              <div className="nodrag absolute right-1.5 top-9 z-30 w-48 overflow-hidden rounded-lg border border-ink/10 bg-white py-1 text-sm shadow-float dark:border-white/10 dark:bg-[#26251d]">
+                {(
+                  [
+                    { icon: <Baby className="h-4 w-4 text-emerald-600" />, label: 'Thêm con', fn: addChild },
+                    { icon: <Heart className="h-4 w-4 text-female" />, label: 'Thêm vợ / chồng', fn: addSpouse },
+                    { icon: <Pencil className="h-4 w-4" />, label: 'Sửa thông tin', fn: onEdit, divider: true },
+                    { icon: <Trash2 className="h-4 w-4" />, label: 'Xoá thành viên', fn: onDelete, danger: true },
+                  ] as const
+                ).map((it) => (
+                  <div key={it.label}>
+                    {'divider' in it && it.divider && (
+                      <div className="my-1 h-px bg-ink/10 dark:bg-white/10" />
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenu(false);
+                        it.fn?.(person.id);
+                      }}
+                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left transition hover:bg-surface-200 dark:hover:bg-white/10 ${
+                        'danger' in it && it.danger
+                          ? 'text-crimson'
+                          : 'text-ink/80 dark:text-white/80'
+                      }`}
+                    >
+                      {it.icon}
+                      {it.label}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Canvas } from './components/Canvas';
 import { Toolbar } from './components/Toolbar';
 import { PersonDrawer } from './components/PersonDrawer';
@@ -21,10 +21,13 @@ export default function App() {
     document.documentElement.classList.toggle('dark', dark);
   }, [dark]);
 
-  const openEditor = (id: string) => {
-    setSelected(id);
-    setEditingId(id);
-  };
+  const openEditor = useCallback(
+    (id: string) => {
+      setSelected(id);
+      setEditingId(id);
+    },
+    [setSelected],
+  );
   const closeEditor = () => {
     setEditingId(null);
     setSelected(null);
@@ -34,7 +37,7 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-canvas dark:bg-[#14130d]">
-      <Canvas onEdit={openEditor} />
+      <Canvas onEdit={openEditor} onRequestDelete={setPendingDelete} />
       <Toolbar onEdit={openEditor} />
 
       <PersonDrawer

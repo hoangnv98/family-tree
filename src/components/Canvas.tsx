@@ -41,7 +41,12 @@ function matches(p: Person, q: string): boolean {
   );
 }
 
-function Flow({ onEdit }: { onEdit: (id: string) => void }) {
+interface CanvasProps {
+  onEdit: (id: string) => void;
+  onRequestDelete: (id: string) => void;
+}
+
+function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   const people = useTreeStore((s) => s.people);
   const relationships = useTreeStore((s) => s.relationships);
   const selectedId = useTreeStore((s) => s.selectedId);
@@ -178,11 +183,13 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
                 : null,
             addChild: handleAddChild,
             addSpouse: handleAddSpouse,
+            onEdit,
+            onDelete: onRequestDelete,
           },
         } as Node<PersonNodeData>;
       });
     });
-  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions, handleAddChild, handleAddSpouse]);
+  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions, handleAddChild, handleAddSpouse, onEdit, onRequestDelete]);
 
   // Derive junction "knot" nodes from the live person positions (one per couple
   // with children). They are not stored in state — they follow the parents.
@@ -518,10 +525,10 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   );
 }
 
-export function Canvas({ onEdit }: { onEdit: (id: string) => void }) {
+export function Canvas({ onEdit, onRequestDelete }: CanvasProps) {
   return (
     <ReactFlowProvider>
-      <Flow onEdit={onEdit} />
+      <Flow onEdit={onEdit} onRequestDelete={onRequestDelete} />
     </ReactFlowProvider>
   );
 }
