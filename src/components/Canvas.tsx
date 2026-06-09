@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -68,6 +68,9 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const { fitView, getNodes } = useReactFlow();
   const didInit = useRef(false);
+  // Hovering a person highlights its relationship lines: links up to its parents
+  // turn blue, links down to its children turn green, the spouse line bolder.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const unions = useMemo(() => computeUnions(relationships), [relationships]);
 
@@ -225,6 +228,28 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   useEffect(() => {
     const next: Edge[] = [];
 
+    // When a person is hovered, recolour the lines that touch them so the family
+    // link reads at a glance: blue = up to bố/mẹ, green = down to con, bolder
+    // crimson = vợ/chồng. Unrelated lines stay as-is.
+    const PARENT_HL = '#2563eb';
+    const CHILD_HL = '#16a34a';
+    const applyHover = (
+      base: Record<string, unknown>,
+      kin: { spouse?: [string, string]; parents?: string[]; child?: string },
+    ): Record<string, unknown> => {
+      if (!hoveredId) return base;
+      if (kin.spouse) {
+        return kin.spouse.includes(hoveredId)
+          ? { ...base, stroke: CRIMSON, strokeWidth: 3.5, opacity: 1 }
+          : base;
+      }
+      if (kin.child === hoveredId)
+        return { ...base, stroke: PARENT_HL, strokeWidth: 4, opacity: 1, strokeDasharray: undefined };
+      if (kin.parents?.includes(hoveredId))
+        return { ...base, stroke: CHILD_HL, strokeWidth: 4, opacity: 1, strokeDasharray: undefined };
+      return base;
+    };
+
     // marriage lines — soft bezier, always drawn left→right (husband's right
     // handle → wife's left handle) so the line is a clean short connector and
     // never crosses over. The husband (male) is the left source; if gender can't
@@ -251,7 +276,10 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
         targetHandle: 'left',
         type: 'default',
         selectable: true,
-        style: { stroke: CRIMSON, strokeWidth: 2, strokeDasharray: '5 5' },
+        style: applyHover(
+          { stroke: CRIMSON, strokeWidth: 2, strokeDasharray: '5 5' },
+          { spouse: [r.aId, r.bId] },
+        ),
       });
     }
 
@@ -276,7 +304,10 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
             targetHandle: 'top',
             type: 'smoothstep',
             pathOptions: { borderRadius: 16 },
-            style: childStyle(childId, { stroke: ORANGE, strokeWidth: 2 }),
+            style: applyHover(childStyle(childId, { stroke: ORANGE, strokeWidth: 2 }), {
+              parents: u.parentIds,
+              child: childId,
+            }),
           } as Edge);
         }
       } else if (isCoupleUnion(u.parentIds)) {
@@ -290,7 +321,10 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
             targetHandle: 'top',
             type: 'smoothstep',
             pathOptions: { borderRadius: 16 },
-            style: childStyle(childId, { stroke: ORANGE, strokeWidth: 2 }),
+            style: applyHover(childStyle(childId, { stroke: ORANGE, strokeWidth: 2 }), {
+              parents: u.parentIds,
+              child: childId,
+            }),
           } as Edge);
         }
       } else {
@@ -312,7 +346,10 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
               targetHandle: 'top',
               type: 'smoothstep',
               pathOptions: { borderRadius: 16 },
-              style: childStyle(childId, base),
+              style: applyHover(childStyle(childId, base), {
+                parents: u.parentIds,
+                child: childId,
+              }),
             } as Edge);
           }
         }
@@ -320,7 +357,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
     }
 
     setEdges(next);
-  }, [relationships, unions, isCoupleUnion, isMultiWifeUnion, motherOf, moverIds, relocatedPair, genderOf, spouseCount, setEdges]);
+  }, [relationships, unions, isCoupleUnion, isMultiWifeUnion, motherOf, moverIds, relocatedPair, genderOf, spouseCount, hoveredId, setEdges]);
 
   const doLayout = useCallback(() => {
     const positioned = layoutTree(people, relationships);
@@ -474,6 +511,11 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
     [setSelected, onEdit],
   );
 
+  const onNodeMouseEnter: NodeMouseHandler = useCallback((_, node) => {
+    if (node.type === 'person') setHoveredId(node.id);
+  }, []);
+  const onNodeMouseLeave: NodeMouseHandler = useCallback(() => setHoveredId(null), []);
+
   // Persist a node's position after a manual drag so it survives reloads.
   const onNodeDragStop: OnNodeDrag<Node> = useCallback(
     (_, node) => {
@@ -517,6 +559,8 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
       onConnect={onConnect}
       onEdgesDelete={onEdgesDelete}
       onNodeClick={onNodeClick}
+      onNodeMouseEnter={onNodeMouseEnter}
+      onNodeMouseLeave={onNodeMouseLeave}
       onNodeDragStop={onNodeDragStop}
       onPaneClick={() => setSelected(null)}
       colorMode={dark ? 'dark' : 'light'}
