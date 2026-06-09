@@ -19,8 +19,14 @@ import {
 } from '@xyflow/react';
 import { toPng } from 'html-to-image';
 import { useTreeStore } from '../store/treeStore';
-import { NODE_WIDTH, NODE_HEIGHT } from '../lib/layout';
+import {
+  NODE_WIDTH,
+  NODE_HEIGHT,
+  NODE_WIDTH_COMPACT,
+  NODE_HEIGHT_COMPACT,
+} from '../lib/layout';
 import { layoutTreeVertical } from '../lib/layoutVertical';
+import { computeGenerations } from '../lib/generations';
 import { computeUnions } from '../lib/unions';
 import { resolveMarriedIn, marriedInIds } from '../lib/marriage';
 import { PersonNode, type PersonNodeData } from './PersonNode';
@@ -82,6 +88,19 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   const genderOf = useMemo(
     () => new Map(people.map((p) => [p.id, p.gender])),
     [people],
+  );
+
+  // Generation 3+ (cháu) renders as a compact portrait card and is sized that
+  // way in the layout, so junctions must use per-node dimensions.
+  const genOf = useMemo(() => computeGenerations(people, relationships), [people, relationships]);
+  const isCompact = useCallback((id: string) => (genOf.get(id) ?? 1) >= 3, [genOf]);
+  const widthOf = useCallback(
+    (id: string) => (isCompact(id) ? NODE_WIDTH_COMPACT : NODE_WIDTH),
+    [isCompact],
+  );
+  const heightOf = useCallback(
+    (id: string) => (isCompact(id) ? NODE_HEIGHT_COMPACT : NODE_HEIGHT),
+    [isCompact],
   );
 
   // Hover quick-add: create the new person near its anchor and open the editor.
@@ -183,6 +202,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
                     ? 'Rể'
                     : null
                 : null,
+            compact: isCompact(p.id),
             addChild: handleAddChild,
             addSpouse: handleAddSpouse,
             onEdit,
@@ -191,7 +211,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
         } as Node<PersonNodeData>;
       });
     });
-  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions, handleAddChild, handleAddSpouse, onEdit, onRequestDelete]);
+  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions, isCompact, handleAddChild, handleAddSpouse, onEdit, onRequestDelete]);
 
   // Derive junction "knot" nodes from the live person positions (one per couple
   // with children). They are not stored in state — they follow the parents.
@@ -202,9 +222,11 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
       if (!isCoupleUnion(u.parentIds)) continue;
       if (isMultiWifeUnion(u.parentIds)) continue; // children drop from the mother
       const centers = u.parentIds
-        .map((id) => posById.get(id))
-        .filter((p): p is { x: number; y: number } => !!p)
-        .map((p) => ({ x: p.x + NODE_WIDTH / 2, y: p.y + NODE_HEIGHT / 2 }));
+        .map((id) => {
+          const p = posById.get(id);
+          return p ? { x: p.x + widthOf(id) / 2, y: p.y + heightOf(id) / 2 } : null;
+        })
+        .filter((p): p is { x: number; y: number } => !!p);
       if (centers.length < 2) continue;
       const cx = centers.reduce((s, c) => s + c.x, 0) / centers.length;
       const cy = centers.reduce((s, c) => s + c.y, 0) / centers.length;
@@ -219,7 +241,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
       });
     }
     return out;
-  }, [unions, nodes, isCoupleUnion, isMultiWifeUnion]);
+  }, [unions, nodes, isCoupleUnion, isMultiWifeUnion, widthOf, heightOf]);
 
   const allNodes = useMemo(() => [...nodes, ...junctionNodes], [nodes, junctionNodes]);
 

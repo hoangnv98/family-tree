@@ -4,6 +4,10 @@ import { resolveMarriedIn } from './marriage';
 
 export const NODE_WIDTH = 260;
 export const NODE_HEIGHT = 96;
+// Compact "portrait" card used from generation 3 (cháu) down: narrow + tall,
+// avatar on top and name below, so a deep column takes far less width.
+export const NODE_WIDTH_COMPACT = 150;
+export const NODE_HEIGHT_COMPACT = 116;
 
 export interface Positioned {
   id: string;

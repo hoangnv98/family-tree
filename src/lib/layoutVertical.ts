@@ -1,20 +1,27 @@
 import type { Person, Relationship } from '../types';
-import { NODE_WIDTH, NODE_HEIGHT, type Positioned } from './layout';
+import {
+  NODE_WIDTH,
+  NODE_HEIGHT,
+  NODE_WIDTH_COMPACT,
+  NODE_HEIGHT_COMPACT,
+  type Positioned,
+} from './layout';
+import { computeGenerations } from './generations';
 
 /**
  * "Vertical" reading layout for deep trees: generations 1–2 stay horizontal
  * (root couple on top, their children spread as columns), but from generation 3
  * down each branch becomes an indented vertical list — like a traditional gia
- * phả outline. Keeps the same cards/edges as the tree layout; only positions
- * differ. A married-in spouse is shown beside their partner; the blood line is
+ * phả outline, and the cards become compact portrait cards so the column stays
+ * narrow. A married-in spouse is shown beside their partner; the blood line is
  * the primary node that children indent under.
  */
 
-const V_GAP = 34; // vertical gap between stacked rows
-const ROW_STEP = NODE_HEIGHT + V_GAP; // baseline → baseline of next stacked row
-const INDENT = 56; // horizontal indent added per generation (gen ≥ 3)
-const COUPLE_GAP = 44; // gap between a person and the spouse shown beside them
-const COL_GAP = 80; // gap between generation-2 columns
+const V_GAP = 30; // vertical gap between stacked rows
+const ROW_STEP = NODE_HEIGHT + V_GAP; // fallback step for the leftover row
+const INDENT = 48; // horizontal indent added per generation (gen ≥ 3)
+const COUPLE_GAP = 30; // gap between a person and the spouse shown beside them
+const COL_GAP = 70; // gap between generation-2 columns
 const FAMILY_GAP = 160; // gap between separate root families
 
 export function layoutTreeVertical(
@@ -26,6 +33,10 @@ export function layoutTreeVertical(
   const parentsOf = new Map<string, string[]>();
   const childrenOf = new Map<string, string[]>();
   const genderOf = new Map(people.map((p) => [p.id, p.gender]));
+  const genOf = computeGenerations(people, relationships);
+  // Generation 3+ uses the narrow portrait card.
+  const wOf = (id: string) => ((genOf.get(id) ?? 1) >= 3 ? NODE_WIDTH_COMPACT : NODE_WIDTH);
+  const hOf = (id: string) => ((genOf.get(id) ?? 1) >= 3 ? NODE_HEIGHT_COMPACT : NODE_HEIGHT);
   const push = (m: Map<string, string[]>, k: string, v: string) =>
     m.set(k, [...(m.get(k) ?? []), v]);
 
@@ -81,7 +92,7 @@ export function layoutTreeVertical(
     y: number,
   ): { bottom: number; right: number } {
     let cy = y;
-    let right = x + NODE_WIDTH;
+    let right = x;
     for (const k of kids) {
       const res = place(k, x, cy);
       right = Math.max(right, res.right);
@@ -94,22 +105,25 @@ export function layoutTreeVertical(
   // One spouse → shown beside; multiple spouses (e.g. vợ 2) → each spouse is a
   // separate indented branch with her own children, so wives never get tangled.
   function place(id: string, x: number, y: number): { bottom: number; right: number } {
-    if (placed.has(id)) return { bottom: y + NODE_HEIGHT, right: x + NODE_WIDTH };
+    const w = wOf(id);
+    const h = hOf(id);
+    if (placed.has(id)) return { bottom: y + h, right: x + w };
     placed.add(id);
     const spouses = (spouseOf.get(id) ?? []).filter((s) => !placed.has(s));
 
     if (spouses.length >= 2) {
       // husband alone on top; each wife + her children form an indented branch.
       pos.set(id, { id, x, y });
-      let right = x + NODE_WIDTH;
-      let cy = y + ROW_STEP;
+      let right = x + w;
+      let cy = y + h + V_GAP;
       for (const wifeId of sortByOrder(spouses)) {
         placed.add(wifeId);
+        const wh = hOf(wifeId);
         pos.set(wifeId, { id: wifeId, x: x + INDENT, y: cy });
-        right = Math.max(right, x + INDENT + NODE_WIDTH);
-        const res = stackChildren(sharedChildren(id, wifeId), x + 2 * INDENT, cy + ROW_STEP);
+        right = Math.max(right, x + INDENT + wOf(wifeId));
+        const res = stackChildren(sharedChildren(id, wifeId), x + 2 * INDENT, cy + wh + V_GAP);
         right = Math.max(right, res.right);
-        cy = Math.max(res.bottom, cy + NODE_HEIGHT) + V_GAP;
+        cy = Math.max(res.bottom, cy + wh) + V_GAP;
       }
       // any of `id`'s children without a co-parent in the tree: under id.
       const res = stackChildren(unitChildren(id), x + INDENT, cy);
@@ -122,15 +136,15 @@ export function layoutTreeVertical(
     const sp = spouses[0];
     const [leftId, rightId] = orderCouple(id, sp);
     pos.set(leftId, { id: leftId, x, y });
-    let right = x + NODE_WIDTH;
+    let right = x + w;
     if (sp && rightId) {
       placed.add(sp);
-      const sx = x + NODE_WIDTH + COUPLE_GAP;
+      const sx = x + w + COUPLE_GAP;
       pos.set(rightId, { id: rightId, x: sx, y });
-      right = sx + NODE_WIDTH;
+      right = sx + wOf(rightId);
     }
-    const res = stackChildren(unitChildren(id, sp), x + INDENT, y + ROW_STEP);
-    return { bottom: Math.max(res.bottom, y + NODE_HEIGHT), right: Math.max(right, res.right) };
+    const res = stackChildren(unitChildren(id, sp), x + INDENT, y + h + V_GAP);
+    return { bottom: Math.max(res.bottom, y + h), right: Math.max(right, res.right) };
   }
 
   // A root family: head (+ spouse) on top, generation-2 children as columns,
@@ -138,20 +152,22 @@ export function layoutTreeVertical(
   function placeFamily(headId: string, startX: number): number {
     placed.add(headId);
     const sp = besideSpouse(headId);
+    const w = wOf(headId);
+    const h = hOf(headId);
     const [leftId, rightId] = orderCouple(headId, sp);
     pos.set(leftId, { id: leftId, x: startX, y: 0 });
-    let right = startX + NODE_WIDTH;
+    let right = startX + w;
 
     if (sp && rightId) {
       placed.add(sp);
-      const sx = startX + NODE_WIDTH + COUPLE_GAP;
+      const sx = startX + w + COUPLE_GAP;
       pos.set(rightId, { id: rightId, x: sx, y: 0 });
-      right = sx + NODE_WIDTH;
+      right = sx + wOf(rightId);
     }
 
     let colX = startX + INDENT;
     for (const child of unitChildren(headId, sp)) {
-      const res = place(child, colX, ROW_STEP);
+      const res = place(child, colX, h + V_GAP);
       colX = res.right + COL_GAP;
       right = Math.max(right, res.right);
     }

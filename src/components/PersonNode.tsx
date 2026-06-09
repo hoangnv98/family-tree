@@ -9,6 +9,8 @@ export interface PersonNodeData {
   readOnly?: boolean;
   /** "Dâu" / "Rể" tag for married-in spouses; null when not shown. */
   inLawRole?: 'Dâu' | 'Rể' | null;
+  /** Compact portrait card (generation 3+): avatar on top, name below. */
+  compact?: boolean;
   /** Quick-add actions shown on hover (omitted in read-only view). */
   addChild?: (id: string) => void;
   addSpouse?: (id: string) => void;
@@ -34,7 +36,7 @@ const handleCls = (color: string) =>
   `!h-2 !w-2 ${color} !opacity-0 transition-opacity group-hover:!opacity-100`;
 
 function PersonNodeComponent({ data, selected }: NodeProps) {
-  const { person, dimmed, readOnly, inLawRole, addChild, addSpouse, onEdit, onDelete } =
+  const { person, dimmed, readOnly, inLawRole, compact, addChild, addSpouse, onEdit, onDelete } =
     data as PersonNodeData;
   const span = lifespan(person);
   const [menu, setMenu] = useState(false);
@@ -42,7 +44,10 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
   return (
     <div
       className={[
-        'group relative flex w-[260px] items-center gap-3 rounded-brand border bg-white/90 px-3 py-2.5 shadow-card backdrop-blur transition',
+        'group relative flex rounded-brand border bg-white/90 shadow-card backdrop-blur transition',
+        compact
+          ? 'w-[150px] flex-col items-center gap-1 px-2 py-2.5 text-center'
+          : 'w-[260px] items-center gap-3 px-3 py-2.5',
         // dark: a solid warm-grey card that clearly lifts off the near-black canvas
         'dark:bg-[#2b2a23] dark:shadow-[0_2px_12px_rgba(0,0,0,0.45)]',
         selected
@@ -51,49 +56,71 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
         dimmed ? 'opacity-30' : 'opacity-100',
       ].join(' ')}
     >
-      {/* gender accent bar */}
+      {/* gender accent bar — left edge (wide card) / top edge (compact card) */}
       <span
-        className={`absolute left-0 top-2 bottom-2 w-1 rounded-full ${genderBar[person.gender]}`}
+        className={`absolute rounded-full ${genderBar[person.gender]} ${
+          compact ? 'left-3 right-3 top-0 h-1' : 'left-0 top-2 bottom-2 w-1'
+        }`}
       />
 
       {/* avatar */}
       <div
-        className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-300 ring-2 ${genderRing[person.gender]} dark:bg-[#3a3930]`}
+        className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-300 ring-2 ${
+          genderRing[person.gender]
+        } dark:bg-[#3a3930] ${compact ? 'h-12 w-12' : 'h-11 w-11'}`}
       >
         {person.photo ? (
           <img src={person.photo} alt="" className="h-full w-full object-cover" />
         ) : (
-          <User className="h-5 w-5 text-ink/40 dark:text-white/40" />
+          <User className={compact ? 'h-6 w-6 text-ink/40 dark:text-white/40' : 'h-5 w-5 text-ink/40 dark:text-white/40'} />
         )}
       </div>
 
       {/* text */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-1.5">
-          <div className="flex-1 break-words text-sm font-semibold text-ink dark:text-white">
+      {compact ? (
+        <div className="min-w-0 w-full">
+          <div className="break-words text-xs font-semibold leading-tight text-ink dark:text-white">
             {fullName(person)}
           </div>
-          {inLawRole && (
-            <span
-              className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
-                inLawRole === 'Dâu'
-                  ? 'bg-female/15 text-female'
-                  : 'bg-male/15 text-male'
-              }`}
-            >
-              {inLawRole}
-            </span>
+          {(span || inLawRole) && (
+            <div className="mt-0.5 flex items-center justify-center gap-1">
+              {span && <span className="text-[10px] text-ink/50 dark:text-white/50">{span}</span>}
+              {inLawRole && (
+                <span
+                  className={`rounded-full px-1 text-[9px] font-semibold leading-none ${
+                    inLawRole === 'Dâu' ? 'bg-female/15 text-female' : 'bg-male/15 text-male'
+                  }`}
+                >
+                  {inLawRole}
+                </span>
+              )}
+            </div>
           )}
         </div>
-        {span && (
-          <div className="text-xs text-ink/50 dark:text-white/50">{span}</div>
-        )}
-        {person.occupation && (
-          <div className="break-words text-xs text-ink/40 dark:text-white/40">
-            {person.occupation}
+      ) : (
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-1.5">
+            <div className="flex-1 break-words text-sm font-semibold text-ink dark:text-white">
+              {fullName(person)}
+            </div>
+            {inLawRole && (
+              <span
+                className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                  inLawRole === 'Dâu' ? 'bg-female/15 text-female' : 'bg-male/15 text-male'
+                }`}
+              >
+                {inLawRole}
+              </span>
+            )}
           </div>
-        )}
-      </div>
+          {span && <div className="text-xs text-ink/50 dark:text-white/50">{span}</div>}
+          {person.occupation && (
+            <div className="break-words text-xs text-ink/40 dark:text-white/40">
+              {person.occupation}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* connection handles — top/bottom = parent↓child, left/right = spouse.
           Hidden until the card is hovered so deleted links don't leave stray
