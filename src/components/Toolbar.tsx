@@ -50,6 +50,33 @@ function IconButton({
   );
 }
 
+// A row inside the ⋯ dropdown — used for the destructive actions and, on mobile,
+// for the secondary actions that don't fit on the toolbar.
+function MenuRow({
+  onClick,
+  icon,
+  children,
+  danger,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 px-3 py-2 text-sm ${
+        danger
+          ? 'text-crimson hover:bg-crimson/10'
+          : 'text-ink/80 hover:bg-surface-300 dark:text-white/80 dark:hover:bg-white/10'
+      }`}
+    >
+      {icon} {children}
+    </button>
+  );
+}
+
 export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   const people = useTreeStore((s) => s.people);
   const relationships = useTreeStore((s) => s.relationships);
@@ -220,50 +247,53 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
             )}
           </div>
 
-          <div className="mx-1 h-6 w-px bg-ink/10 dark:bg-white/10" />
-
-          <IconButton onClick={requestLayout} title="Sắp xếp tự động">
-            <LayoutGrid className="h-5 w-5" />
-          </IconButton>
-          {!readOnly && (
+          {/* secondary actions — inline on ≥sm, collapsed into the ⋯ menu on mobile */}
+          <div className="hidden items-center gap-2 sm:flex">
+            <div className="mx-1 h-6 w-px bg-ink/10 dark:bg-white/10" />
+            <IconButton onClick={requestLayout} title="Sắp xếp tự động">
+              <LayoutGrid className="h-5 w-5" />
+            </IconButton>
+            {!readOnly && (
+              <IconButton
+                onClick={() => fileRef.current?.click()}
+                title="Nhập JSON (tạo cây chia sẻ theo tên file)"
+              >
+                <Upload className="h-5 w-5" />
+              </IconButton>
+            )}
+            <IconButton onClick={onExport} title="Xuất JSON">
+              <Download className="h-5 w-5" />
+            </IconButton>
+            {!isShared && !readOnly && (
+              <IconButton onClick={onShareToCloud} title="Chia sẻ lên cloud (ai có link cũng sửa)">
+                <Share2 className="h-5 w-5" />
+              </IconButton>
+            )}
             <IconButton
-              onClick={() => fileRef.current?.click()}
-              title="Nhập JSON (tạo cây chia sẻ theo tên file)"
+              onClick={() => {
+                requestPng();
+                flash('ok', 'Đang tạo ảnh PNG…');
+              }}
+              title="Xuất ảnh PNG"
             >
-              <Upload className="h-5 w-5" />
+              <ImageDown className="h-5 w-5" />
             </IconButton>
-          )}
-          <IconButton onClick={onExport} title="Xuất JSON">
-            <Download className="h-5 w-5" />
-          </IconButton>
-          {!isShared && !readOnly && (
-            <IconButton onClick={onShareToCloud} title="Chia sẻ lên cloud (ai có link cũng sửa)">
-              <Share2 className="h-5 w-5" />
+            <IconButton
+              onClick={toggleInLaw}
+              active={showInLaw}
+              title={showInLaw ? 'Ẩn nhãn Dâu / Rể' : 'Hiện nhãn Dâu / Rể'}
+            >
+              <Tags className="h-5 w-5" />
             </IconButton>
-          )}
-          <IconButton
-            onClick={() => {
-              requestPng();
-              flash('ok', 'Đang tạo ảnh PNG…');
-            }}
-            title="Xuất ảnh PNG"
-          >
-            <ImageDown className="h-5 w-5" />
-          </IconButton>
-          <IconButton
-            onClick={toggleInLaw}
-            active={showInLaw}
-            title={showInLaw ? 'Ẩn nhãn Dâu / Rể' : 'Hiện nhãn Dâu / Rể'}
-          >
-            <Tags className="h-5 w-5" />
-          </IconButton>
-          <IconButton onClick={toggleDark} title={dark ? 'Chế độ sáng' : 'Chế độ tối'}>
-            {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </IconButton>
+            <IconButton onClick={toggleDark} title={dark ? 'Chế độ sáng' : 'Chế độ tối'}>
+              {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </IconButton>
+          </div>
 
-          {/* overflow menu — destructive actions, hidden in locked view */}
-          {!readOnly && (
-          <div className="relative">
+          {/* ⋯ menu — holds the secondary actions on mobile + destructive ones.
+              On ≥sm it only carries destructive actions, so it's hidden there
+              in locked (read-only) view where there are none. */}
+          <div className={readOnly ? 'relative sm:hidden' : 'relative'}>
             <IconButton onClick={() => setMenu((v) => !v)} title="Thêm" active={menu}>
               <MoreHorizontal className="h-5 w-5" />
             </IconButton>
@@ -271,43 +301,120 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
               <>
                 <div className="fixed inset-0 z-0" onClick={() => setMenu(false)} />
                 <div className="absolute right-0 top-11 z-10 w-60 overflow-hidden rounded-brand border border-ink/10 bg-canvas py-1 shadow-float dark:border-white/10 dark:bg-[#1b1a14]">
-                  <button
-                    onClick={() => {
-                      requestLayout();
-                      setMenu(false);
-                      flash('ok', 'Đã căn lại sơ đồ về hàng ngay ngắn.');
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink/80 hover:bg-surface-300 dark:text-white/80 dark:hover:bg-white/10"
-                  >
-                    <LayoutGrid className="h-4 w-4" /> Căn lại sơ đồ (hàng đẹp)
-                  </button>
-                  <div className="my-1 h-px bg-ink/10 dark:bg-white/10" />
-                  <button
-                    onClick={() => {
-                      resetToSample();
-                      requestLayout();
-                      setMenu(false);
-                      flash('ok', 'Đã nạp lại dữ liệu mẫu.');
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink/80 hover:bg-surface-300 dark:text-white/80 dark:hover:bg-white/10"
-                  >
-                    <RotateCcw className="h-4 w-4" /> Nạp lại dữ liệu mẫu
-                  </button>
-                  <button
-                    onClick={() => {
-                      clearAll();
-                      setMenu(false);
-                      flash('ok', 'Đã xoá toàn bộ. Bắt đầu cây mới.');
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-crimson hover:bg-crimson/10"
-                  >
-                    <Eraser className="h-4 w-4" /> Xoá hết, làm cây mới
-                  </button>
+                  {/* mobile-only mirror of the inline secondary actions */}
+                  <div className="sm:hidden">
+                    <MenuRow
+                      icon={<LayoutGrid className="h-4 w-4" />}
+                      onClick={() => {
+                        requestLayout();
+                        setMenu(false);
+                      }}
+                    >
+                      Sắp xếp tự động
+                    </MenuRow>
+                    {!readOnly && (
+                      <MenuRow
+                        icon={<Upload className="h-4 w-4" />}
+                        onClick={() => {
+                          setMenu(false);
+                          fileRef.current?.click();
+                        }}
+                      >
+                        Nhập JSON
+                      </MenuRow>
+                    )}
+                    <MenuRow
+                      icon={<Download className="h-4 w-4" />}
+                      onClick={() => {
+                        setMenu(false);
+                        onExport();
+                      }}
+                    >
+                      Xuất JSON
+                    </MenuRow>
+                    {!isShared && !readOnly && (
+                      <MenuRow
+                        icon={<Share2 className="h-4 w-4" />}
+                        onClick={() => {
+                          setMenu(false);
+                          onShareToCloud();
+                        }}
+                      >
+                        Chia sẻ lên cloud
+                      </MenuRow>
+                    )}
+                    <MenuRow
+                      icon={<ImageDown className="h-4 w-4" />}
+                      onClick={() => {
+                        setMenu(false);
+                        requestPng();
+                        flash('ok', 'Đang tạo ảnh PNG…');
+                      }}
+                    >
+                      Xuất ảnh PNG
+                    </MenuRow>
+                    <MenuRow
+                      icon={<Tags className="h-4 w-4" />}
+                      onClick={() => {
+                        toggleInLaw();
+                        setMenu(false);
+                      }}
+                    >
+                      {showInLaw ? 'Ẩn nhãn Dâu / Rể' : 'Hiện nhãn Dâu / Rể'}
+                    </MenuRow>
+                    <MenuRow
+                      icon={dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                      onClick={() => {
+                        toggleDark();
+                        setMenu(false);
+                      }}
+                    >
+                      {dark ? 'Chế độ sáng' : 'Chế độ tối'}
+                    </MenuRow>
+                    {!readOnly && <div className="my-1 h-px bg-ink/10 dark:bg-white/10" />}
+                  </div>
+
+                  {/* destructive actions — only when editable */}
+                  {!readOnly && (
+                    <>
+                      <MenuRow
+                        icon={<LayoutGrid className="h-4 w-4" />}
+                        onClick={() => {
+                          requestLayout();
+                          setMenu(false);
+                          flash('ok', 'Đã căn lại sơ đồ về hàng ngay ngắn.');
+                        }}
+                      >
+                        Căn lại sơ đồ (hàng đẹp)
+                      </MenuRow>
+                      <MenuRow
+                        icon={<RotateCcw className="h-4 w-4" />}
+                        onClick={() => {
+                          resetToSample();
+                          requestLayout();
+                          setMenu(false);
+                          flash('ok', 'Đã nạp lại dữ liệu mẫu.');
+                        }}
+                      >
+                        Nạp lại dữ liệu mẫu
+                      </MenuRow>
+                      <MenuRow
+                        danger
+                        icon={<Eraser className="h-4 w-4" />}
+                        onClick={() => {
+                          clearAll();
+                          setMenu(false);
+                          flash('ok', 'Đã xoá toàn bộ. Bắt đầu cây mới.');
+                        }}
+                      >
+                        Xoá hết, làm cây mới
+                      </MenuRow>
+                    </>
+                  )}
                 </div>
               </>
             )}
           </div>
-          )}
 
           <input
             ref={fileRef}
