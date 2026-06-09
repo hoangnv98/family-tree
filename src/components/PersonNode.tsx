@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { User } from 'lucide-react';
+import { User, Plus, Heart } from 'lucide-react';
 import { fullName, lifespan, type Person } from '../types';
 
 export interface PersonNodeData {
@@ -9,6 +9,9 @@ export interface PersonNodeData {
   readOnly?: boolean;
   /** "Dâu" / "Rể" tag for married-in spouses; null when not shown. */
   inLawRole?: 'Dâu' | 'Rể' | null;
+  /** Quick-add actions shown on hover (omitted in read-only view). */
+  addChild?: (id: string) => void;
+  addSpouse?: (id: string) => void;
   [key: string]: unknown;
 }
 
@@ -29,15 +32,18 @@ const handleCls = (color: string) =>
   `!h-2 !w-2 ${color} !opacity-0 transition-opacity group-hover:!opacity-100`;
 
 function PersonNodeComponent({ data, selected }: NodeProps) {
-  const { person, dimmed, readOnly, inLawRole } = data as PersonNodeData;
+  const { person, dimmed, readOnly, inLawRole, addChild, addSpouse } = data as PersonNodeData;
   const span = lifespan(person);
 
   return (
     <div
       className={[
         'group relative flex w-[260px] items-center gap-3 rounded-brand border bg-white/90 px-3 py-2.5 shadow-card backdrop-blur transition',
-        'dark:bg-surface-500/90 dark:border-white/10',
-        selected ? 'border-accent ring-2 ring-accent/40' : 'border-ink/10',
+        // dark: a solid warm-grey card that clearly lifts off the near-black canvas
+        'dark:bg-[#2b2a23] dark:shadow-[0_2px_12px_rgba(0,0,0,0.45)]',
+        selected
+          ? 'border-accent ring-2 ring-accent/40'
+          : 'border-ink/10 dark:border-white/15',
         dimmed ? 'opacity-30' : 'opacity-100',
       ].join(' ')}
     >
@@ -95,6 +101,32 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
           <Handle id="bottom" type="source" position={Position.Bottom} className={handleCls('!bg-accent/70')} />
           <Handle id="left" type="target" position={Position.Left} className={handleCls('!bg-female/70')} />
           <Handle id="right" type="source" position={Position.Right} className={handleCls('!bg-female/70')} />
+
+          {/* quick-add: appears on hover, below the card. green + = thêm con,
+              pink ♥ = thêm vợ/chồng. nodrag/stopPropagation so it doesn't drag
+              or open the editor for this card. */}
+          <div className="nodrag absolute -bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              title="Thêm con"
+              onClick={(e) => {
+                e.stopPropagation();
+                addChild?.(person.id);
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-float ring-2 ring-white transition hover:bg-emerald-600 dark:ring-[#2b2a23]"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <button
+              title="Thêm vợ / chồng"
+              onClick={(e) => {
+                e.stopPropagation();
+                addSpouse?.(person.id);
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-female text-white shadow-float ring-2 ring-white transition hover:brightness-95 dark:ring-[#2b2a23]"
+            >
+              <Heart className="h-4 w-4" />
+            </button>
+          </div>
         </>
       )}
     </div>

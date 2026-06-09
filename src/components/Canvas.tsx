@@ -75,6 +75,28 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     [people],
   );
 
+  // Hover quick-add: create the new person near its anchor and open the editor.
+  const handleAddChild = useCallback(
+    (parentId: string) => {
+      const st = useTreeStore.getState();
+      const nid = st.addChild(parentId);
+      const p = getNodes().find((n) => n.id === parentId)?.position;
+      if (p) st.setPosition(nid, p.x, p.y + NODE_HEIGHT + 90);
+      onEdit(nid);
+    },
+    [getNodes, onEdit],
+  );
+  const handleAddSpouse = useCallback(
+    (personId: string) => {
+      const st = useTreeStore.getState();
+      const nid = st.addSpouse(personId);
+      const p = getNodes().find((n) => n.id === personId)?.position;
+      if (p) st.setPosition(nid, p.x + NODE_WIDTH + 50, p.y);
+      onEdit(nid);
+    },
+    [getNodes, onEdit],
+  );
+
   // How many spouses each person has — a 2+ count means a "vợ 2" family that the
   // vertical layout stacks, so its marriage lines route top→bottom instead.
   const spouseCount = useMemo(() => {
@@ -154,11 +176,13 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
                     ? 'Rể'
                     : null
                 : null,
+            addChild: handleAddChild,
+            addSpouse: handleAddSpouse,
           },
         } as Node<PersonNodeData>;
       });
     });
-  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions]);
+  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions, handleAddChild, handleAddSpouse]);
 
   // Derive junction "knot" nodes from the live person positions (one per couple
   // with children). They are not stored in state — they follow the parents.
@@ -362,7 +386,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     const cleanup = () => restore.forEach((fn) => fn());
 
     toPng(viewportEl, {
-      backgroundColor: dark ? '#1c1b16' : '#f2f1ed',
+      backgroundColor: dark ? '#14130d' : '#f2f1ed',
       width: imageWidth,
       height: imageHeight,
       pixelRatio: 2,
@@ -453,7 +477,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   );
 
   const minimapColor = useMemo(
-    () => (dark ? 'rgba(255,255,255,0.15)' : 'rgba(38,37,30,0.12)'),
+    () => (dark ? 'rgba(255,255,255,0.07)' : 'rgba(38,37,30,0.12)'),
     [dark],
   );
 

@@ -33,7 +33,7 @@ export default function App() {
   const deleteTarget = pendingDelete ? people.find((p) => p.id === pendingDelete) : null;
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-canvas dark:bg-[#1c1b16]">
+    <div className="relative h-full w-full overflow-hidden bg-canvas dark:bg-[#14130d]">
       <Canvas onEdit={openEditor} />
       <Toolbar onEdit={openEditor} />
 

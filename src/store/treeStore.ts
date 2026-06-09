@@ -60,6 +60,10 @@ interface TreeState {
   addPerson: (partial?: Partial<Person>) => string;
   updatePerson: (id: string, patch: Partial<Person>) => void;
   removePerson: (id: string) => void;
+  /** Add a child to `parentId` (and their spouse, if any). Returns the new id. */
+  addChild: (parentId: string) => string;
+  /** Add a spouse to `personId` (opposite gender by default). Returns new id. */
+  addSpouse: (personId: string) => string;
 
   // relationship CRUD
   addRelationship: (rel: RelationshipInput) => void;
@@ -128,6 +132,48 @@ export const useTreeStore = create<TreeState>()(
         const person = newPerson(partial);
         set((s) => ({ people: [...s.people, person], selectedId: person.id }));
         return person.id;
+      },
+
+      addChild: (parentId) => {
+        const child = newPerson({ firstName: 'Con mới' });
+        set((s) => {
+          // also attach the parent's spouse(s) so it's the couple's child
+          const coParents = s.relationships
+            .filter(
+              (r): r is Extract<Relationship, { type: 'spouse' }> =>
+                r.type === 'spouse' && (r.aId === parentId || r.bId === parentId),
+            )
+            .map((r) => (r.aId === parentId ? r.bId : r.aId));
+          const parentIds = [parentId, ...coParents];
+          const rels = parentIds.map(
+            (pid) =>
+              ({ id: nanoid(8), type: 'parent', parentId: pid, childId: child.id }) as Relationship,
+          );
+          return {
+            people: [...s.people, child],
+            relationships: [...s.relationships, ...rels],
+            selectedId: child.id,
+          };
+        });
+        return child.id;
+      },
+
+      addSpouse: (personId) => {
+        const spouse = newPerson({ firstName: 'Vợ / chồng mới' });
+        set((s) => {
+          const me = s.people.find((p) => p.id === personId);
+          spouse.gender =
+            me?.gender === 'male' ? 'female' : me?.gender === 'female' ? 'male' : 'other';
+          return {
+            people: [...s.people, spouse],
+            relationships: [
+              ...s.relationships,
+              { id: nanoid(8), type: 'spouse', aId: personId, bId: spouse.id } as Relationship,
+            ],
+            selectedId: spouse.id,
+          };
+        });
+        return spouse.id;
       },
 
       updatePerson: (id, patch) =>
