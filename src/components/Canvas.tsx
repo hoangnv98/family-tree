@@ -205,14 +205,16 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       const aMale = genderOf.get(r.aId) === 'male';
       const bMale = genderOf.get(r.bId) === 'male';
 
-      // "Vợ 2" family: the husband (2+ spouses) sits above each wife, so route
-      // the marriage line husband-bottom → wife-top for a clean vertical branch.
+      // "Vợ 2" family: only the vertical layout stacks the wives below the
+      // husband, so route the marriage line husband-bottom → wife-top there.
       const husbandId =
-        (spouseCount.get(r.aId) ?? 0) >= 2
-          ? r.aId
-          : (spouseCount.get(r.bId) ?? 0) >= 2
-            ? r.bId
-            : null;
+        layoutMode !== 'vertical'
+          ? null
+          : (spouseCount.get(r.aId) ?? 0) >= 2
+            ? r.aId
+            : (spouseCount.get(r.bId) ?? 0) >= 2
+              ? r.bId
+              : null;
       if (husbandId) {
         const wifeId = husbandId === r.aId ? r.bId : r.aId;
         next.push({
@@ -315,7 +317,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     }
 
     setEdges(next);
-  }, [relationships, unions, isCoupleUnion, isMultiWifeUnion, motherOf, moverIds, relocatedPair, genderOf, spouseCount, setEdges]);
+  }, [relationships, unions, isCoupleUnion, isMultiWifeUnion, motherOf, moverIds, relocatedPair, genderOf, spouseCount, layoutMode, setEdges]);
 
   const doLayout = useCallback(() => {
     const positioned =
