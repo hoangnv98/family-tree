@@ -87,9 +87,8 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   const handleAddChild = useCallback(
     (parentId: string) => {
       const st = useTreeStore.getState();
-      const nid = st.addChild(parentId);
       const p = getNodes().find((n) => n.id === parentId)?.position;
-      if (p) st.setPosition(nid, p.x, p.y + NODE_HEIGHT + 90);
+      const nid = st.addChild(parentId, p ? { x: p.x, y: p.y + NODE_HEIGHT + 90 } : undefined);
       onEdit(nid);
     },
     [getNodes, onEdit],
@@ -97,9 +96,8 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   const handleAddSpouse = useCallback(
     (personId: string) => {
       const st = useTreeStore.getState();
-      const nid = st.addSpouse(personId);
       const p = getNodes().find((n) => n.id === personId)?.position;
-      if (p) st.setPosition(nid, p.x + NODE_WIDTH + 50, p.y);
+      const nid = st.addSpouse(personId, p ? { x: p.x + NODE_WIDTH + 50, y: p.y } : undefined);
       onEdit(nid);
     },
     [getNodes, onEdit],

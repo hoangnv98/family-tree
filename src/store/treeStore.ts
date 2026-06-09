@@ -24,6 +24,22 @@ const noopStorage = {
   removeItem: () => {},
 };
 
+// ----- Undo history (session-only, keeps the last 10 edits) -----
+type Snapshot = {
+  people: Person[];
+  relationships: Relationship[];
+  positions: PositionMap;
+};
+const UNDO_LIMIT = 10;
+const undoStack: Snapshot[] = [];
+let isRestoring = false; // true while applying undo / a file load → don't record
+let prevSnap: Snapshot | null = null;
+const snapOf = (s: { people: Person[]; relationships: Relationship[]; positions: PositionMap }): Snapshot => ({
+  people: s.people,
+  relationships: s.relationships,
+  positions: s.positions,
+});
+
 interface TreeState {
   people: Person[];
   relationships: Relationship[];
@@ -61,9 +77,11 @@ interface TreeState {
   updatePerson: (id: string, patch: Partial<Person>) => void;
   removePerson: (id: string) => void;
   /** Add a child to `parentId` (and their spouse, if any). Returns the new id. */
-  addChild: (parentId: string) => string;
+  addChild: (parentId: string, pos?: { x: number; y: number }) => string;
   /** Add a spouse to `personId` (opposite gender by default). Returns new id. */
-  addSpouse: (personId: string) => string;
+  addSpouse: (personId: string, pos?: { x: number; y: number }) => string;
+  /** Revert the last edit (up to the 10 most recent). */
+  undo: () => void;
 
   // relationship CRUD
   addRelationship: (rel: RelationshipInput) => void;
@@ -134,7 +152,7 @@ export const useTreeStore = create<TreeState>()(
         return person.id;
       },
 
-      addChild: (parentId) => {
+      addChild: (parentId, pos) => {
         const child = newPerson({ firstName: 'Con mới' });
         set((s) => {
           // also attach the parent's spouse(s) so it's the couple's child
@@ -152,13 +170,14 @@ export const useTreeStore = create<TreeState>()(
           return {
             people: [...s.people, child],
             relationships: [...s.relationships, ...rels],
+            positions: pos ? { ...s.positions, [child.id]: pos } : s.positions,
             selectedId: child.id,
           };
         });
         return child.id;
       },
 
-      addSpouse: (personId) => {
+      addSpouse: (personId, pos) => {
         const spouse = newPerson({ firstName: 'Vợ / chồng mới' });
         set((s) => {
           const me = s.people.find((p) => p.id === personId);
@@ -170,6 +189,7 @@ export const useTreeStore = create<TreeState>()(
               ...s.relationships,
               { id: nanoid(8), type: 'spouse', aId: personId, bId: spouse.id } as Relationship,
             ],
+            positions: pos ? { ...s.positions, [spouse.id]: pos } : s.positions,
             selectedId: spouse.id,
           };
         });
@@ -208,14 +228,32 @@ export const useTreeStore = create<TreeState>()(
       removeRelationship: (id) =>
         set((s) => ({ relationships: s.relationships.filter((r) => r.id !== id) })),
 
-      loadFile: (file) =>
+      loadFile: (file) => {
+        // a fresh load is not an undoable edit; reset the history
+        isRestoring = true;
         set({
           people: file.people,
           relationships: file.relationships,
           positions: file.positions ?? {},
           selectedId: null,
           search: '',
-        }),
+        });
+        isRestoring = false;
+        undoStack.length = 0;
+      },
+
+      undo: () => {
+        const snap = undoStack.pop();
+        if (!snap) return;
+        isRestoring = true;
+        set({
+          people: snap.people,
+          relationships: snap.relationships,
+          positions: snap.positions,
+          selectedId: null,
+        });
+        isRestoring = false;
+      },
 
       resetToSample: () =>
         set({ ...sampleData(), positions: {}, selectedId: null, search: '' }),
@@ -235,6 +273,24 @@ export const useTreeStore = create<TreeState>()(
     },
   ),
 );
+
+// Record an undo step whenever the tree data changes (people / relationships /
+// positions). Selection/search/ui changes don't touch those refs, so they're
+// ignored. Restores (undo, file load) set `isRestoring` so they aren't recorded.
+prevSnap = snapOf(useTreeStore.getState());
+useTreeStore.subscribe((state) => {
+  const cur = snapOf(state);
+  const changed =
+    !prevSnap ||
+    prevSnap.people !== cur.people ||
+    prevSnap.relationships !== cur.relationships ||
+    prevSnap.positions !== cur.positions;
+  if (changed && !isRestoring && prevSnap) {
+    undoStack.push(prevSnap);
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  }
+  prevSnap = cur;
+});
 
 /** Convenience selectors */
 export const selectPerson = (id: string | null) => (s: TreeState) =>

@@ -21,6 +21,21 @@ export default function App() {
     document.documentElement.classList.toggle('dark', dark);
   }, [dark]);
 
+  // Ctrl/Cmd+Z → undo the last edit. Skip when typing in a field so the browser
+  // can do its own text undo there.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' || e.shiftKey) return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+      e.preventDefault();
+      useTreeStore.getState().undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const openEditor = useCallback(
     (id: string) => {
       setSelected(id);
