@@ -105,6 +105,19 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     [coupleKeys],
   );
 
+  // A "vợ 2" couple: one parent has 2+ spouses. The vertical layout stacks the
+  // wives, so children drop straight from the wife (mother) instead of going
+  // through a shared junction far to the side.
+  const isMultiWifeUnion = useCallback(
+    (parentIds: string[]) => parentIds.some((p) => (spouseCount.get(p) ?? 0) >= 2),
+    [spouseCount],
+  );
+  const motherOf = useCallback(
+    (parentIds: string[]) =>
+      parentIds.find((p) => (spouseCount.get(p) ?? 0) < 2) ?? parentIds[0],
+    [spouseCount],
+  );
+
   // Married-in spouses: sit next to their partner; their link to birth parents
   // is drawn as a thin "origin" line, and the marriage line is forced to run
   // anchor → mover (left → right) so it stays a clean short connector.
@@ -156,6 +169,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     const out: Node[] = [];
     for (const u of unions) {
       if (!isCoupleUnion(u.parentIds)) continue;
+      if (isMultiWifeUnion(u.parentIds)) continue; // children drop from the mother
       const centers = u.parentIds
         .map((id) => posById.get(id))
         .filter((p): p is { x: number; y: number } => !!p)
@@ -174,7 +188,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       });
     }
     return out;
-  }, [unions, nodes, isCoupleUnion]);
+  }, [unions, nodes, isCoupleUnion, isMultiWifeUnion]);
 
   const allNodes = useMemo(() => [...nodes, ...junctionNodes], [nodes, junctionNodes]);
 
@@ -245,7 +259,22 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
 
     // parent → child links
     for (const u of unions) {
-      if (isCoupleUnion(u.parentIds)) {
+      if (isMultiWifeUnion(u.parentIds)) {
+        // vợ 2: drop straight from the mother (a clean vertical line under her)
+        const mother = motherOf(u.parentIds);
+        for (const childId of u.childIds) {
+          next.push({
+            id: `${u.id}__${childId}`,
+            source: mother,
+            target: childId,
+            sourceHandle: 'bottom',
+            targetHandle: 'top',
+            type: 'smoothstep',
+            pathOptions: { borderRadius: 16 },
+            style: childStyle(childId, { stroke: ORANGE, strokeWidth: 2 }),
+          } as Edge);
+        }
+      } else if (isCoupleUnion(u.parentIds)) {
         // real couple: one shared line from the junction knot to every child
         for (const childId of u.childIds) {
           next.push({
@@ -286,7 +315,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     }
 
     setEdges(next);
-  }, [relationships, unions, isCoupleUnion, moverIds, relocatedPair, genderOf, spouseCount, setEdges]);
+  }, [relationships, unions, isCoupleUnion, isMultiWifeUnion, motherOf, moverIds, relocatedPair, genderOf, spouseCount, setEdges]);
 
   const doLayout = useCallback(() => {
     const positioned =
