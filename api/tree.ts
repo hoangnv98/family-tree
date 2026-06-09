@@ -61,6 +61,9 @@ export default async function handler(req: any, res: any) {
       meta: body.meta ?? { name: 'Cây gia phả', exportedAt: new Date().toISOString() },
       people: body.people,
       relationships: body.relationships,
+      ...(body.positions && typeof body.positions === 'object'
+        ? { positions: body.positions }
+        : {}),
       updatedAt: Date.now(),
     };
     await redis.set(key, record);

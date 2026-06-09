@@ -2,6 +2,7 @@ import {
   familyTreeFileSchema,
   type FamilyTreeFile,
   type Person,
+  type PositionMap,
   type Relationship,
 } from '../types';
 
@@ -10,12 +11,14 @@ export function buildFile(
   people: Person[],
   relationships: Relationship[],
   name = 'Cây gia phả',
+  positions?: PositionMap,
 ): FamilyTreeFile {
   return {
     version: 1,
     meta: { name, exportedAt: new Date().toISOString() },
     people,
     relationships,
+    ...(positions && Object.keys(positions).length ? { positions } : {}),
   };
 }
 

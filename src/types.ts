@@ -63,6 +63,11 @@ export type RelationshipInput =
   | Omit<ParentRelationship, 'id'>
   | Omit<SpouseRelationship, 'id'>;
 
+export const positionSchema = z.object({ x: z.number(), y: z.number() });
+export type Position = z.infer<typeof positionSchema>;
+/** Saved node positions keyed by person id (manual drags + last auto-layout). */
+export type PositionMap = Record<string, Position>;
+
 export const familyTreeFileSchema = z.object({
   version: z.literal(1),
   meta: z.object({
@@ -71,6 +76,7 @@ export const familyTreeFileSchema = z.object({
   }),
   people: z.array(personSchema),
   relationships: z.array(relationshipSchema),
+  positions: z.record(positionSchema).optional(),
 });
 export type FamilyTreeFile = z.infer<typeof familyTreeFileSchema>;
 

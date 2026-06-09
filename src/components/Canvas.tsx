@@ -15,6 +15,7 @@ import {
   type Edge,
   type Connection,
   type NodeMouseHandler,
+  type OnNodeDrag,
 } from '@xyflow/react';
 import { toPng } from 'html-to-image';
 import { useTreeStore } from '../store/treeStore';
@@ -49,12 +50,16 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   const dark = useTreeStore((s) => s.dark);
   const layoutTick = useTreeStore((s) => s.layoutTick);
   const pngTick = useTreeStore((s) => s.pngTick);
+  const fitTick = useTreeStore((s) => s.fitTick);
   const setSelected = useTreeStore((s) => s.setSelected);
   const addRelationship = useTreeStore((s) => s.addRelationship);
   const removeRelationship = useTreeStore((s) => s.removeRelationship);
   const readOnly = useTreeStore((s) => s.readOnly);
   const showInLaw = useTreeStore((s) => s.showInLaw);
   const layoutMode = useTreeStore((s) => s.layoutMode);
+  const positions = useTreeStore((s) => s.positions);
+  const setPosition = useTreeStore((s) => s.setPosition);
+  const setPositions = useTreeStore((s) => s.setPositions);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -96,7 +101,8 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     return m;
   }, [married]);
 
-  // Sync person nodes from people, preserving existing positions.
+  // Sync person nodes from people, using saved positions (manual drags / last
+  // auto-layout) first, then any live position, then a default.
   useEffect(() => {
     setNodes((prev) => {
       const byId = new Map(prev.map((n) => [n.id, n]));
@@ -105,7 +111,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
         return {
           id: p.id,
           type: 'person',
-          position: existing?.position ?? { x: 100, y: 100 },
+          position: positions[p.id] ?? existing?.position ?? { x: 100, y: 100 },
           selected: p.id === selectedId,
           draggable: !readOnly,
           data: {
@@ -124,7 +130,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
         } as Node<PersonNodeData>;
       });
     });
-  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw]);
+  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions]);
 
   // Derive junction "knot" nodes from the live person positions (one per couple
   // with children). They are not stored in state — they follow the parents.
@@ -240,19 +246,36 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
         return pos ? { ...n, position: { x: pos.x, y: pos.y } } : n;
       }),
     );
+    // Persist the computed arrangement so it survives reloads / other tabs.
+    const saved: Record<string, { x: number; y: number }> = {};
+    for (const p of positioned) saved[p.id] = { x: p.x, y: p.y };
+    setPositions(saved);
     requestAnimationFrame(() => fitView({ padding: 0.2, duration: 400 }));
-  }, [people, relationships, setNodes, fitView, layoutMode]);
+  }, [people, relationships, setNodes, setPositions, fitView, layoutMode]);
 
-  // Layout once on first mount, and whenever the toolbar requests it.
+  // On first mount keep the saved arrangement (just fit); only auto-layout when
+  // there are no saved positions yet. Later layout requests always re-arrange.
   useEffect(() => {
     if (!didInit.current) {
       didInit.current = true;
-      doLayout();
+      if (Object.keys(positions).length > 0) {
+        requestAnimationFrame(() => fitView({ padding: 0.2, duration: 400 }));
+      } else {
+        doLayout();
+      }
       return;
     }
     doLayout();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutTick]);
+
+  // Re-center on request (e.g. after a shared tree loads async) without
+  // recomputing positions.
+  useEffect(() => {
+    if (fitTick === 0) return;
+    requestAnimationFrame(() => fitView({ padding: 0.2, duration: 400 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitTick]);
 
   // Export the whole tree as a PNG when the toolbar requests it.
   useEffect(() => {
@@ -366,6 +389,15 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     [setSelected, onEdit],
   );
 
+  // Persist a node's position after a manual drag so it survives reloads.
+  const onNodeDragStop: OnNodeDrag<Node> = useCallback(
+    (_, node) => {
+      if (node.type !== 'person') return;
+      setPosition(node.id, node.position.x, node.position.y);
+    },
+    [setPosition],
+  );
+
   const minimapColor = useMemo(
     () => (dark ? 'rgba(255,255,255,0.15)' : 'rgba(38,37,30,0.12)'),
     [dark],
@@ -381,6 +413,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       onConnect={onConnect}
       onEdgesDelete={onEdgesDelete}
       onNodeClick={onNodeClick}
+      onNodeDragStop={onNodeDragStop}
       onPaneClick={() => setSelected(null)}
       colorMode={dark ? 'dark' : 'light'}
       fitView

@@ -64,6 +64,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   const layoutMode = useTreeStore((s) => s.layoutMode);
   const toggleLayoutMode = useTreeStore((s) => s.toggleLayoutMode);
   const cloudSave = useTreeStore((s) => s.cloudSave);
+  const positions = useTreeStore((s) => s.positions);
 
   const isShared = getSharedTreeName() !== null;
   const requestLayout = useTreeStore((s) => s.requestLayout);
@@ -84,7 +85,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   };
 
   const onExport = () => {
-    downloadJson(buildFile(people, relationships));
+    downloadJson(buildFile(people, relationships, 'Cây gia phả', positions));
     flash('ok', 'Đã xuất file JSON.');
   };
 
@@ -92,7 +93,10 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   const onShareToCloud = async () => {
     flash('ok', 'Đang tạo cây chia sẻ…');
     const id = newTreeId();
-    const res = await saveCloudTree(id, buildFile(people, relationships, 'Cây gia phả'));
+    const res = await saveCloudTree(
+      id,
+      buildFile(people, relationships, 'Cây gia phả', positions),
+    );
     if (res.ok) {
       window.location.search = `?tree=${id}`; // reload into cloud-edit mode
     } else if (res.disabled) {

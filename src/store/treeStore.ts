@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { nanoid } from 'nanoid';
-import type { Person, Relationship, RelationshipInput, FamilyTreeFile } from '../types';
+import type {
+  Person,
+  Relationship,
+  RelationshipInput,
+  FamilyTreeFile,
+  PositionMap,
+} from '../types';
 import { sampleData } from '../lib/sample';
 import { getSharedTreeName } from '../lib/shareLink';
 
@@ -26,6 +32,7 @@ interface TreeState {
   dark: boolean;
   layoutTick: number;
   pngTick: number;
+  fitTick: number;
   /** Locked view: editing UI is hidden (shared tree while cloud is off). */
   readOnly: boolean;
   /** Cloud autosave status for the shared (`?tree=`) editing session. */
@@ -34,9 +41,13 @@ interface TreeState {
   showInLaw: boolean;
   /** 'tree' = horizontal node-link; 'vertical' = indented from generation 3. */
   layoutMode: 'tree' | 'vertical';
+  /** Saved node positions (manual drags + last auto-layout), keyed by person id. */
+  positions: PositionMap;
 
   // selection / ui
   setReadOnly: (v: boolean) => void;
+  setPosition: (id: string, x: number, y: number) => void;
+  setPositions: (map: PositionMap) => void;
   setCloudSave: (s: TreeState['cloudSave']) => void;
   setSelected: (id: string | null) => void;
   setSearch: (q: string) => void;
@@ -45,6 +56,8 @@ interface TreeState {
   toggleLayoutMode: () => void;
   requestLayout: () => void;
   requestPng: () => void;
+  /** Re-center the view without recomputing positions (used after a cloud load). */
+  requestFit: () => void;
 
   // person CRUD
   addPerson: (partial?: Partial<Person>) => string;
@@ -95,13 +108,18 @@ export const useTreeStore = create<TreeState>()(
       dark: false,
       layoutTick: 0,
       pngTick: 0,
+      fitTick: 0,
       readOnly,
       cloudSave: 'off',
       showInLaw: true,
       layoutMode: 'tree',
+      positions: {},
 
       setReadOnly: (v) => set({ readOnly: v }),
       setCloudSave: (s) => set({ cloudSave: s }),
+      setPosition: (id, x, y) =>
+        set((s) => ({ positions: { ...s.positions, [id]: { x, y } } })),
+      setPositions: (map) => set({ positions: map }),
       setSelected: (id) => set({ selectedId: id }),
       setSearch: (q) => set({ search: q }),
       toggleDark: () => set((s) => ({ dark: !s.dark })),
@@ -114,6 +132,7 @@ export const useTreeStore = create<TreeState>()(
         })),
       requestLayout: () => set((s) => ({ layoutTick: s.layoutTick + 1 })),
       requestPng: () => set((s) => ({ pngTick: s.pngTick + 1 })),
+      requestFit: () => set((s) => ({ fitTick: s.fitTick + 1 })),
 
       addPerson: (partial) => {
         const person = newPerson(partial);
@@ -127,15 +146,20 @@ export const useTreeStore = create<TreeState>()(
         })),
 
       removePerson: (id) =>
-        set((s) => ({
-          people: s.people.filter((p) => p.id !== id),
-          relationships: s.relationships.filter((r) =>
-            r.type === 'parent'
-              ? r.parentId !== id && r.childId !== id
-              : r.aId !== id && r.bId !== id,
-          ),
-          selectedId: s.selectedId === id ? null : s.selectedId,
-        })),
+        set((s) => {
+          const positions = { ...s.positions };
+          delete positions[id];
+          return {
+            people: s.people.filter((p) => p.id !== id),
+            relationships: s.relationships.filter((r) =>
+              r.type === 'parent'
+                ? r.parentId !== id && r.childId !== id
+                : r.aId !== id && r.bId !== id,
+            ),
+            positions,
+            selectedId: s.selectedId === id ? null : s.selectedId,
+          };
+        }),
 
       addRelationship: (rel) =>
         set((s) => {
@@ -152,12 +176,15 @@ export const useTreeStore = create<TreeState>()(
         set({
           people: file.people,
           relationships: file.relationships,
+          positions: file.positions ?? {},
           selectedId: null,
           search: '',
         }),
 
-      resetToSample: () => set({ ...sampleData(), selectedId: null, search: '' }),
-      clearAll: () => set({ people: [], relationships: [], selectedId: null, search: '' }),
+      resetToSample: () =>
+        set({ ...sampleData(), positions: {}, selectedId: null, search: '' }),
+      clearAll: () =>
+        set({ people: [], relationships: [], positions: {}, selectedId: null, search: '' }),
     }),
     {
       name: 'family-tree-v1',
@@ -165,6 +192,7 @@ export const useTreeStore = create<TreeState>()(
       partialize: (s) => ({
         people: s.people,
         relationships: s.relationships,
+        positions: s.positions,
         dark: s.dark,
         showInLaw: s.showInLaw,
         layoutMode: s.layoutMode,

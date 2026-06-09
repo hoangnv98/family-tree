@@ -18,10 +18,13 @@ const SAVE_DEBOUNCE = 1000;
 export function CloudSync() {
   const people = useTreeStore((s) => s.people);
   const relationships = useTreeStore((s) => s.relationships);
+  const positions = useTreeStore((s) => s.positions);
   const loadFile = useTreeStore((s) => s.loadFile);
   const clearAll = useTreeStore((s) => s.clearAll);
   const setReadOnly = useTreeStore((s) => s.setReadOnly);
   const setCloudSave = useTreeStore((s) => s.setCloudSave);
+  const requestLayout = useTreeStore((s) => s.requestLayout);
+  const requestFit = useTreeStore((s) => s.requestFit);
 
   const id = getSharedTreeName();
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>(
@@ -35,6 +38,10 @@ export function CloudSync() {
   const lastSavedRef = useRef('');
   const timerRef = useRef<number | undefined>(undefined);
 
+  // After a load: keep the saved arrangement (just re-center) when the file has
+  // positions; otherwise auto-layout (which computes + persists positions).
+  const settle = (hasPositions: boolean) => (hasPositions ? requestFit() : requestLayout());
+
   // Initial load.
   useEffect(() => {
     if (!id) return;
@@ -47,11 +54,16 @@ export function CloudSync() {
       if (cloud.status === 'ok') {
         nameRef.current = cloud.file.meta.name;
         loadFile(cloud.file);
-        lastSavedRef.current = serialize(cloud.file.people, cloud.file.relationships);
+        lastSavedRef.current = serialize(
+          cloud.file.people,
+          cloud.file.relationships,
+          cloud.file.positions ?? {},
+        );
         liveRef.current = true;
         setReadOnly(false);
         setCloudSave('idle');
         setPhase('ready');
+        settle(!!cloud.file.positions && Object.keys(cloud.file.positions).length > 0);
         return;
       }
 
@@ -60,18 +72,25 @@ export function CloudSync() {
         // file if one is bundled, else start blank. First edit creates it.
         const seed = await fetchSharedTree(id);
         if (cancelled) return;
+        let seededPositions = false;
         if (seed.ok) {
           nameRef.current = seed.file.meta.name;
           loadFile(seed.file);
-          lastSavedRef.current = serialize(seed.file.people, seed.file.relationships);
+          lastSavedRef.current = serialize(
+            seed.file.people,
+            seed.file.relationships,
+            seed.file.positions ?? {},
+          );
+          seededPositions = !!seed.file.positions && Object.keys(seed.file.positions).length > 0;
         } else {
           clearAll();
-          lastSavedRef.current = serialize([], []);
+          lastSavedRef.current = serialize([], [], {});
         }
         liveRef.current = true;
         setReadOnly(false);
         setCloudSave('idle');
         setPhase('ready');
+        settle(seededPositions);
         return;
       }
 
@@ -83,6 +102,7 @@ export function CloudSync() {
           loadFile(seed.file);
           setCloudSave('off'); // stays read-only
           setPhase('ready');
+          settle(!!seed.file.positions && Object.keys(seed.file.positions).length > 0);
         } else {
           setErrorMsg(
             'Cây chia sẻ chưa được bật lưu trữ đám mây, và không có bản tĩnh đi kèm.',
@@ -102,16 +122,20 @@ export function CloudSync() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Debounced autosave (only in a live cloud session).
+  // Debounced autosave (only in a live cloud session). Position changes count
+  // too, so dragging a node persists to the cloud.
   useEffect(() => {
     if (!id || !liveRef.current) return;
-    const snapshot = serialize(people, relationships);
+    const snapshot = serialize(people, relationships, positions);
     if (snapshot === lastSavedRef.current) return;
 
     window.clearTimeout(timerRef.current);
     setCloudSave('saving');
     timerRef.current = window.setTimeout(async () => {
-      const res = await saveCloudTree(id, buildFile(people, relationships, nameRef.current));
+      const res = await saveCloudTree(
+        id,
+        buildFile(people, relationships, nameRef.current, positions),
+      );
       if (res.ok) {
         lastSavedRef.current = snapshot;
         setCloudSave('saved');
@@ -122,7 +146,7 @@ export function CloudSync() {
     }, SAVE_DEBOUNCE);
 
     return () => window.clearTimeout(timerRef.current);
-  }, [people, relationships, id, setCloudSave]);
+  }, [people, relationships, positions, id, setCloudSave]);
 
   if (phase === 'idle' || phase === 'ready') return null;
 
@@ -135,6 +159,6 @@ export function CloudSync() {
   );
 }
 
-function serialize(people: unknown, relationships: unknown): string {
-  return JSON.stringify({ people, relationships });
+function serialize(people: unknown, relationships: unknown, positions: unknown): string {
+  return JSON.stringify({ people, relationships, positions });
 }
