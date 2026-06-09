@@ -85,16 +85,15 @@ export function computeKinship(
 
     const selfSibs = siblingsOf(selfId);
 
-    const siblingTerm = (id: string, ho = false) => {
+    const siblingTerm = (id: string) => {
       const g = gender(id);
-      const base = older(id, selfId)
+      return older(id, selfId)
         ? g === 'male'
           ? 'Anh'
           : g === 'female'
             ? 'Chị'
             : 'Anh/Chị'
         : 'Em';
-      return base + (ho ? ' họ' : '');
     };
 
     // sibling of self's father (nội) or mother (ngoại) → bác/chú/cô/cậu/dì
@@ -114,6 +113,25 @@ export function computeKinship(
         return 'Cậu/Dì';
       }
       return null;
+    };
+    // Cousin (anh/chị/em họ). Seniority is NOT the cousins' own ages — it
+    // follows their parents': con của bác (anh/chị của bố/mẹ mình) là anh/chị
+    // họ, con của chú/cô/cậu/dì là em họ, dù người con đó có ít tuổi hơn.
+    const cousinTerm = (id: string): string => {
+      const g = gender(id);
+      let senior = false;
+      for (const p of parentsOf.get(id) ?? []) {
+        if (father && siblingsOf(father).has(p) && older(p, father)) senior = true;
+        if (mother && siblingsOf(mother).has(p) && older(p, mother)) senior = true;
+      }
+      const base = senior
+        ? g === 'male'
+          ? 'Anh'
+          : g === 'female'
+            ? 'Chị'
+            : 'Anh/Chị'
+        : 'Em';
+      return base + ' họ';
     };
     const spouseOfUncleAunt = (id: string): string | null => {
       for (const sp of spouseOf.get(id) ?? []) {
@@ -156,7 +174,7 @@ export function computeKinship(
           uncleAunt(id) ??
           spouseOfUncleAunt(id) ??
           ((parentsOf.get(id) ?? []).some((p) => uncleAunt(p))
-            ? siblingTerm(id, true) // cousin → anh/chị/em họ
+            ? cousinTerm(id) // cousin → anh/chị/em họ
             : (spouseOf.get(id) ?? []).some((sp) => desc.get(sp) === 1)
               ? g === 'male'
                 ? 'Con rể'
