@@ -19,22 +19,15 @@ import {
 } from '@xyflow/react';
 import { toPng } from 'html-to-image';
 import { useTreeStore } from '../store/treeStore';
-import {
-  layoutTree,
-  NODE_WIDTH,
-  NODE_HEIGHT,
-  NODE_WIDTH_COMPACT,
-  NODE_HEIGHT_COMPACT,
-} from '../lib/layout';
+import { layoutTree, NODE_WIDTH, NODE_HEIGHT } from '../lib/layout';
 import { computeGenerations } from '../lib/generations';
 import { computeKinship } from '../lib/kinship';
 import { computeUnions } from '../lib/unions';
 import { resolveMarriedIn, marriedInIds } from '../lib/marriage';
 import { PersonNode, type PersonNodeData } from './PersonNode';
-import { JunctionNode, JUNCTION_SIZE } from './JunctionNode';
 import { fullName, type Person } from '../types';
 
-const nodeTypes = { person: PersonNode, junction: JunctionNode };
+const nodeTypes = { person: PersonNode };
 
 const ORANGE = '#f54e00';
 const CRIMSON = '#cf2d56';
@@ -102,14 +95,6 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   // way in the layout, so junctions must use per-node dimensions.
   const genOf = useMemo(() => computeGenerations(people, relationships), [people, relationships]);
   const isCompact = useCallback((id: string) => (genOf.get(id) ?? 1) >= 3, [genOf]);
-  const widthOf = useCallback(
-    (id: string) => (isCompact(id) ? NODE_WIDTH_COMPACT : NODE_WIDTH),
-    [isCompact],
-  );
-  const heightOf = useCallback(
-    (id: string) => (isCompact(id) ? NODE_HEIGHT_COMPACT : NODE_HEIGHT),
-    [isCompact],
-  );
 
   // Hover quick-add: create the new person near its anchor and open the editor.
   const handleAddChild = useCallback(
@@ -223,37 +208,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
     });
   }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions, isCompact, kinMap, hoveredId, handleAddChild, handleAddSpouse, onEdit, onRequestDelete]);
 
-  // Derive junction "knot" nodes from the live person positions (one per couple
-  // with children). They are not stored in state — they follow the parents.
-  const junctionNodes = useMemo<Node[]>(() => {
-    const posById = new Map(nodes.map((n) => [n.id, n.position]));
-    const out: Node[] = [];
-    for (const u of unions) {
-      if (!isCoupleUnion(u.parentIds)) continue;
-      if (isMultiWifeUnion(u.parentIds)) continue; // children drop from the mother
-      const centers = u.parentIds
-        .map((id) => {
-          const p = posById.get(id);
-          return p ? { x: p.x + widthOf(id) / 2, y: p.y + heightOf(id) / 2 } : null;
-        })
-        .filter((p): p is { x: number; y: number } => !!p);
-      if (centers.length < 2) continue;
-      const cx = centers.reduce((s, c) => s + c.x, 0) / centers.length;
-      const cy = centers.reduce((s, c) => s + c.y, 0) / centers.length;
-      out.push({
-        id: u.id,
-        type: 'junction',
-        position: { x: cx - JUNCTION_SIZE / 2, y: cy - JUNCTION_SIZE / 2 },
-        data: {},
-        draggable: false,
-        selectable: false,
-        deletable: false,
-      });
-    }
-    return out;
-  }, [unions, nodes, isCoupleUnion, isMultiWifeUnion, widthOf, heightOf]);
-
-  const allNodes = useMemo(() => [...nodes, ...junctionNodes], [nodes, junctionNodes]);
+  const allNodes = nodes;
 
   // Build edges: marriage lines (spouse) + one shared line per union to children.
   useEffect(() => {
@@ -342,13 +297,16 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
           } as Edge);
         }
       } else if (isCoupleUnion(u.parentIds)) {
-        // real couple: one shared line from the junction knot to every child
+        // real couple: drop each child from one parent (the father). Routing from
+        // a real person node — not a derived junction node — keeps the line from
+        // breaking when nodes rebuild on hover.
+        const dad = u.parentIds.find((p) => genderOf.get(p) === 'male') ?? u.parentIds[0];
         for (const childId of u.childIds) {
           next.push({
             id: `${u.id}__${childId}`,
-            source: u.id,
+            source: dad,
             target: childId,
-            sourceHandle: 'jb',
+            sourceHandle: 'bottom',
             targetHandle: 'top',
             type: 'smoothstep',
             pathOptions: { borderRadius: 16 },
