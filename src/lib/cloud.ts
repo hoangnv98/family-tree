@@ -60,3 +60,20 @@ export async function saveCloudTree(
 // url-safe lowercase slug for new shared trees (matches the API's SLUG rule).
 const slugId = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
 export const newTreeId = () => slugId();
+
+/**
+ * Turn a file name into a safe tree id: drop `.json`, strip Vietnamese
+ * diacritics, lowercase, and collapse anything else to `-`. Returns '' when
+ * nothing usable is left (caller should fall back to newTreeId()).
+ */
+export function slugifyTreeId(filename: string): string {
+  return filename
+    .replace(/\.json$/i, '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip combining diacritics
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}

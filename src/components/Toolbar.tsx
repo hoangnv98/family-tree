@@ -26,7 +26,7 @@ import {
 import { useTreeStore } from '../store/treeStore';
 import { buildFile, downloadJson, readFile } from '../lib/io';
 import { getSharedTreeName } from '../lib/shareLink';
-import { newTreeId, saveCloudTree } from '../lib/cloud';
+import { newTreeId, saveCloudTree, loadCloudTree, slugifyTreeId } from '../lib/cloud';
 
 function IconButton({
   onClick,
@@ -116,15 +116,44 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
 
   const onImportPick = async (file?: File) => {
     if (!file) return;
+    const reset = () => {
+      if (fileRef.current) fileRef.current.value = '';
+    };
     const result = await readFile(file);
-    if (result.ok) {
+    if (!result.ok) {
+      flash('err', result.error);
+      reset();
+      return;
+    }
+
+    // Import becomes a shared cloud tree at id = slug(filename), then redirects
+    // to its link. Falls back to a plain local import when the cloud is off.
+    const id = slugifyTreeId(file.name) || newTreeId();
+    const existing = await loadCloudTree(id);
+
+    if (existing.status === 'disabled' || existing.status === 'error') {
       loadFile(result.file);
       requestLayout();
-      flash('ok', `Đã nhập ${result.file.people.length} thành viên.`);
-    } else {
-      flash('err', result.error);
+      flash('ok', `Đã nhập ${result.file.people.length} thành viên (cloud chưa bật — chỉ ở máy này).`);
+      reset();
+      return;
     }
-    if (fileRef.current) fileRef.current.value = '';
+    if (
+      existing.status === 'ok' &&
+      !window.confirm(`Cây "${id}" đã có trên cloud. Ghi đè bằng file vừa chọn?`)
+    ) {
+      reset();
+      return;
+    }
+
+    flash('ok', 'Đang tải lên cloud…');
+    const save = await saveCloudTree(id, result.file);
+    if (save.ok) {
+      window.location.search = `?tree=${id}`; // reload into the shared tree
+    } else {
+      flash('err', save.error);
+      reset();
+    }
   };
 
   return (
@@ -216,7 +245,10 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
             )}
           </IconButton>
           {!readOnly && (
-            <IconButton onClick={() => fileRef.current?.click()} title="Nhập JSON">
+            <IconButton
+              onClick={() => fileRef.current?.click()}
+              title="Nhập JSON (tạo cây chia sẻ theo tên file)"
+            >
               <Upload className="h-5 w-5" />
             </IconButton>
           )}
