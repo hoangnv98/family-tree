@@ -15,8 +15,6 @@ import {
   X,
   Lock,
   Tags,
-  Network,
-  ListTree,
   Share2,
   Cloud,
   CloudOff,
@@ -61,8 +59,6 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   const toggleDark = useTreeStore((s) => s.toggleDark);
   const showInLaw = useTreeStore((s) => s.showInLaw);
   const toggleInLaw = useTreeStore((s) => s.toggleInLaw);
-  const layoutMode = useTreeStore((s) => s.layoutMode);
-  const toggleLayoutMode = useTreeStore((s) => s.toggleLayoutMode);
   const cloudSave = useTreeStore((s) => s.cloudSave);
   const positions = useTreeStore((s) => s.positions);
 
@@ -228,21 +224,6 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
 
           <IconButton onClick={requestLayout} title="Sắp xếp tự động">
             <LayoutGrid className="h-5 w-5" />
-          </IconButton>
-          <IconButton
-            onClick={toggleLayoutMode}
-            active={layoutMode === 'vertical'}
-            title={
-              layoutMode === 'vertical'
-                ? 'Xem dạng cây (ngang)'
-                : 'Xem dạng dọc (thụt dòng từ đời 3)'
-            }
-          >
-            {layoutMode === 'vertical' ? (
-              <Network className="h-5 w-5" />
-            ) : (
-              <ListTree className="h-5 w-5" />
-            )}
           </IconButton>
           {!readOnly && (
             <IconButton

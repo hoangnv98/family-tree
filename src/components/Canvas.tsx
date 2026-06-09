@@ -20,7 +20,6 @@ import {
 import { toPng } from 'html-to-image';
 import { useTreeStore } from '../store/treeStore';
 import { layoutTree, NODE_WIDTH, NODE_HEIGHT } from '../lib/layout';
-import { layoutTreeVertical } from '../lib/layoutVertical';
 import { computeUnions } from '../lib/unions';
 import { resolveMarriedIn, marriedInIds } from '../lib/marriage';
 import { PersonNode, type PersonNodeData } from './PersonNode';
@@ -56,7 +55,6 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   const removeRelationship = useTreeStore((s) => s.removeRelationship);
   const readOnly = useTreeStore((s) => s.readOnly);
   const showInLaw = useTreeStore((s) => s.showInLaw);
-  const layoutMode = useTreeStore((s) => s.layoutMode);
   const positions = useTreeStore((s) => s.positions);
   const setPosition = useTreeStore((s) => s.setPosition);
   const setPositions = useTreeStore((s) => s.setPositions);
@@ -205,32 +203,6 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       const aMale = genderOf.get(r.aId) === 'male';
       const bMale = genderOf.get(r.bId) === 'male';
 
-      // "Vợ 2" family: only the vertical layout stacks the wives below the
-      // husband, so route the marriage line husband-bottom → wife-top there.
-      const husbandId =
-        layoutMode !== 'vertical'
-          ? null
-          : (spouseCount.get(r.aId) ?? 0) >= 2
-            ? r.aId
-            : (spouseCount.get(r.bId) ?? 0) >= 2
-              ? r.bId
-              : null;
-      if (husbandId) {
-        const wifeId = husbandId === r.aId ? r.bId : r.aId;
-        next.push({
-          id: r.id,
-          source: husbandId,
-          target: wifeId,
-          sourceHandle: 'bottom',
-          targetHandle: 'top',
-          type: 'smoothstep',
-          pathOptions: { borderRadius: 16 },
-          selectable: true,
-          style: { stroke: CRIMSON, strokeWidth: 2, strokeDasharray: '5 5' },
-        } as Edge);
-        continue;
-      }
-
       // Side-by-side couple: husband (male) on the left, line runs left→right.
       let source = r.aId;
       let target = r.bId;
@@ -317,13 +289,10 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     }
 
     setEdges(next);
-  }, [relationships, unions, isCoupleUnion, isMultiWifeUnion, motherOf, moverIds, relocatedPair, genderOf, spouseCount, layoutMode, setEdges]);
+  }, [relationships, unions, isCoupleUnion, isMultiWifeUnion, motherOf, moverIds, relocatedPair, genderOf, spouseCount, setEdges]);
 
   const doLayout = useCallback(() => {
-    const positioned =
-      layoutMode === 'vertical'
-        ? layoutTreeVertical(people, relationships)
-        : layoutTree(people, relationships);
+    const positioned = layoutTree(people, relationships);
     const map = new Map(positioned.map((p) => [p.id, p]));
     setNodes((prev) =>
       prev.map((n) => {
@@ -336,7 +305,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     for (const p of positioned) saved[p.id] = { x: p.x, y: p.y };
     setPositions(saved);
     requestAnimationFrame(() => fitView({ padding: 0.2, duration: 400 }));
-  }, [people, relationships, setNodes, setPositions, fitView, layoutMode]);
+  }, [people, relationships, setNodes, setPositions, fitView]);
 
   // On first mount keep the saved arrangement (just fit); only auto-layout when
   // there are no saved positions yet. Later layout requests always re-arrange.

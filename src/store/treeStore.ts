@@ -39,8 +39,6 @@ interface TreeState {
   cloudSave: 'off' | 'idle' | 'saving' | 'saved' | 'error';
   /** Show a "Dâu" / "Rể" tag on married-in spouses. */
   showInLaw: boolean;
-  /** 'tree' = horizontal node-link; 'vertical' = indented from generation 3. */
-  layoutMode: 'tree' | 'vertical';
   /** Saved node positions (manual drags + last auto-layout), keyed by person id. */
   positions: PositionMap;
 
@@ -53,7 +51,6 @@ interface TreeState {
   setSearch: (q: string) => void;
   toggleDark: () => void;
   toggleInLaw: () => void;
-  toggleLayoutMode: () => void;
   requestLayout: () => void;
   requestPng: () => void;
   /** Re-center the view without recomputing positions (used after a cloud load). */
@@ -112,7 +109,6 @@ export const useTreeStore = create<TreeState>()(
       readOnly,
       cloudSave: 'off',
       showInLaw: true,
-      layoutMode: 'tree',
       positions: {},
 
       setReadOnly: (v) => set({ readOnly: v }),
@@ -124,12 +120,6 @@ export const useTreeStore = create<TreeState>()(
       setSearch: (q) => set({ search: q }),
       toggleDark: () => set((s) => ({ dark: !s.dark })),
       toggleInLaw: () => set((s) => ({ showInLaw: !s.showInLaw })),
-      // switch layout + request a re-layout so positions recompute immediately.
-      toggleLayoutMode: () =>
-        set((s) => ({
-          layoutMode: s.layoutMode === 'tree' ? 'vertical' : 'tree',
-          layoutTick: s.layoutTick + 1,
-        })),
       requestLayout: () => set((s) => ({ layoutTick: s.layoutTick + 1 })),
       requestPng: () => set((s) => ({ pngTick: s.pngTick + 1 })),
       requestFit: () => set((s) => ({ fitTick: s.fitTick + 1 })),
@@ -195,7 +185,6 @@ export const useTreeStore = create<TreeState>()(
         positions: s.positions,
         dark: s.dark,
         showInLaw: s.showInLaw,
-        layoutMode: s.layoutMode,
       }),
     },
   ),
