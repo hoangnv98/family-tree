@@ -73,11 +73,12 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   // turn blue, links down to its children turn green, the spouse line bolder.
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  // While hovering, how the hovered person (ego) would address everyone else —
-  // shown as a vivid badge inside each related card (bố/mẹ, bác/chú/cô, cháu…).
+  // Clicking a person (selecting it) shows how that person addresses everyone
+  // else — a vivid badge inside each related card (bố/mẹ, bác/chú/cô, cháu…).
+  // Driven by selection (not hover) so moving the mouse doesn't re-render cards.
   const kinMap = useMemo(
-    () => (hoveredId ? computeKinship(hoveredId, people, relationships) : null),
-    [hoveredId, people, relationships],
+    () => (selectedId ? computeKinship(selectedId, people, relationships) : null),
+    [selectedId, people, relationships],
   );
 
   const unions = useMemo(() => computeUnions(relationships), [relationships]);
@@ -197,7 +198,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
                 : null,
             compact: isCompact(p.id),
             kinTerm: kinMap?.get(p.id) ?? null,
-            isEgo: hoveredId === p.id,
+            isEgo: selectedId === p.id,
             addChild: handleAddChild,
             addSpouse: handleAddSpouse,
             onEdit,
@@ -206,7 +207,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
         } as Node<PersonNodeData>;
       });
     });
-  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions, isCompact, kinMap, hoveredId, handleAddChild, handleAddSpouse, onEdit, onRequestDelete]);
+  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw, positions, isCompact, kinMap, handleAddChild, handleAddSpouse, onEdit, onRequestDelete]);
 
   const allNodes = nodes;
 
@@ -491,7 +492,15 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
     [removeRelationship, relationships, readOnly],
   );
 
+  // Single click selects the person → shows kinship terms on every related card.
+  // Double click opens the editor. (Hover only highlights the lines.)
   const onNodeClick: NodeMouseHandler = useCallback(
+    (_, node) => {
+      if (node.type === 'person') setSelected(node.id);
+    },
+    [setSelected],
+  );
+  const onNodeDoubleClick: NodeMouseHandler = useCallback(
     (_, node) => {
       if (node.type !== 'person') return;
       setSelected(node.id);
@@ -548,6 +557,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
       onConnect={onConnect}
       onEdgesDelete={onEdgesDelete}
       onNodeClick={onNodeClick}
+      onNodeDoubleClick={onNodeDoubleClick}
       onNodeMouseEnter={onNodeMouseEnter}
       onNodeMouseLeave={onNodeMouseLeave}
       onNodeDragStop={onNodeDragStop}
