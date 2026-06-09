@@ -11,6 +11,10 @@ export interface PersonNodeData {
   inLawRole?: 'Dâu' | 'Rể' | null;
   /** Compact portrait card (generation 3+): avatar on top, name below. */
   compact?: boolean;
+  /** Kinship term shown on hover (how the hovered person addresses this one). */
+  kinTerm?: string | null;
+  /** True if this card is the one currently being hovered (the "ego"). */
+  isEgo?: boolean;
   /** Quick-add actions shown on hover (omitted in read-only view). */
   addChild?: (id: string) => void;
   addSpouse?: (id: string) => void;
@@ -36,7 +40,7 @@ const handleCls = (color: string) =>
   `!h-2 !w-2 ${color} !opacity-0 transition-opacity group-hover:!opacity-100`;
 
 function PersonNodeComponent({ data, selected }: NodeProps) {
-  const { person, dimmed, readOnly, inLawRole, compact, addChild, addSpouse, onEdit, onDelete } =
+  const { person, dimmed, readOnly, inLawRole, compact, kinTerm, isEgo, addChild, addSpouse, onEdit, onDelete } =
     data as PersonNodeData;
   const span = lifespan(person);
   const [menu, setMenu] = useState(false);
@@ -50,12 +54,18 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
           : 'w-[260px] items-center gap-3 px-3 py-2.5',
         // dark: a solid warm-grey card that clearly lifts off the near-black canvas
         'dark:bg-[#2b2a23] dark:shadow-[0_2px_12px_rgba(0,0,0,0.45)]',
-        selected
+        selected || isEgo
           ? 'border-accent ring-2 ring-accent/40'
           : 'border-ink/10 dark:border-white/15',
         dimmed ? 'opacity-30' : 'opacity-100',
       ].join(' ')}
     >
+      {/* kinship term on hover: a vivid badge over the top of the card */}
+      {kinTerm && (
+        <span className="absolute -top-2.5 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-float ring-2 ring-white dark:ring-[#2b2a23]">
+          {kinTerm}
+        </span>
+      )}
       {/* gender accent bar — left edge (wide card) / top edge (compact card) */}
       <span
         className={`absolute rounded-full ${genderBar[person.gender]} ${
