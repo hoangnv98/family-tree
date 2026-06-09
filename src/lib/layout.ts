@@ -64,6 +64,42 @@ export function layoutTree(
     mover.y = anchor.y;
   }
 
+  // Third pass: make sure every monogamous couple sits side by side, even
+  // cross-branch spouses that dagre left apart. Multi-spouse people (vợ 2) are
+  // skipped — a husband can't be adjacent to two wives at once.
+  const GAP = 50;
+  const spouseCount = new Map<string, number>();
+  for (const r of relationships)
+    if (r.type === 'spouse') {
+      spouseCount.set(r.aId, (spouseCount.get(r.aId) ?? 0) + 1);
+      spouseCount.set(r.bId, (spouseCount.get(r.bId) ?? 0) + 1);
+    }
+  const hasKids = (id: string) =>
+    relationships.some((x) => x.type === 'parent' && x.parentId === id);
+  for (const r of relationships) {
+    if (r.type !== 'spouse') continue;
+    if ((spouseCount.get(r.aId) ?? 0) !== 1 || (spouseCount.get(r.bId) ?? 0) !== 1) continue;
+    const a = pos.get(r.aId);
+    const b = pos.get(r.bId);
+    if (!a || !b) continue;
+    // keep the partner that carries the children as the anchor
+    const anchor = hasKids(r.bId) && !hasKids(r.aId) ? b : a;
+    const mover = anchor === a ? b : a;
+    const targetX = anchor.x + NODE_WIDTH + GAP;
+    // already adjacent (either side)?
+    if (
+      Math.abs(mover.y - anchor.y) < 2 &&
+      (Math.abs(mover.x - targetX) < 2 || Math.abs(mover.x - (anchor.x - NODE_WIDTH - GAP)) < 2)
+    )
+      continue;
+    for (const p of pos.values()) {
+      if (p.id === mover.id || p.id === anchor.id) continue;
+      if (Math.abs(p.y - anchor.y) < 1 && p.x >= targetX - 1) p.x += NODE_WIDTH + GAP;
+    }
+    mover.x = targetX;
+    mover.y = anchor.y;
+  }
+
   // Final pass: within each married couple keep the husband on the left and the
   // wife on the right (swap their x if needed) so the marriage line reads a
   // clean left→right and the cards never overlap.
