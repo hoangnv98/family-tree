@@ -1,5 +1,6 @@
 import Dagre from '@dagrejs/dagre';
-import type { Person, Relationship, ParentRelationship } from '../types';
+import type { Person, Relationship } from '../types';
+import { resolveMarriedIn } from './marriage';
 
 export const NODE_WIDTH = 210;
 export const NODE_HEIGHT = 96;
@@ -45,32 +46,22 @@ export function layoutTree(
     pos.set(p.id, { id: p.id, x: n.x - NODE_WIDTH / 2, y: n.y - NODE_HEIGHT / 2 });
   }
 
-  // Second pass: tidy childless couples — but never drag a spouse out of their
-  // own birth family. Only reposition a "married-in" spouse that has no parents
-  // of their own; if both partners belong to a family (cross-branch marriage)
-  // leave them in place and let the marriage line connect across.
-  const childrenOf = (id: string) =>
-    relationships
-      .filter((r): r is ParentRelationship => r.type === 'parent' && r.parentId === id)
-      .map((r) => r.childId);
-  const hasParents = (id: string) =>
-    relationships.some((r) => r.type === 'parent' && r.childId === id);
-
-  const placeBeside = (anchor: Positioned, moving: Positioned) => {
-    moving.y = anchor.y;
-    moving.x = anchor.x + NODE_WIDTH + 50;
-  };
-
-  for (const r of relationships) {
-    if (r.type !== 'spouse') continue;
-    const a = pos.get(r.aId);
-    const b = pos.get(r.bId);
-    if (!a || !b) continue;
-    const shareChild = childrenOf(r.aId).some((c) => childrenOf(r.bId).includes(c));
-    if (shareChild) continue; // dagre already grouped them via shared children
-    if (!hasParents(r.bId)) placeBeside(a, b);
-    else if (!hasParents(r.aId)) placeBeside(b, a);
-    // both rooted in their own family → don't move either one
+  // Second pass: seat each "married-in" spouse right next to their partner,
+  // shifting that row's right-hand neighbours to make room. Their link back to
+  // their birth parents is later drawn as a thin origin line (see Canvas).
+  for (const { moverId, anchorId } of resolveMarriedIn(relationships)) {
+    const anchor = pos.get(anchorId);
+    const mover = pos.get(moverId);
+    if (!anchor || !mover) continue;
+    const targetX = anchor.x + NODE_WIDTH + 50;
+    for (const p of pos.values()) {
+      if (p.id === moverId || p.id === anchorId) continue;
+      if (Math.abs(p.y - anchor.y) < 1 && p.x >= targetX - 1) {
+        p.x += NODE_WIDTH + 50;
+      }
+    }
+    mover.x = targetX;
+    mover.y = anchor.y;
   }
 
   return [...pos.values()];

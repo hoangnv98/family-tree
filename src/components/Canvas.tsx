@@ -20,6 +20,7 @@ import { toPng } from 'html-to-image';
 import { useTreeStore } from '../store/treeStore';
 import { layoutTree, NODE_WIDTH, NODE_HEIGHT } from '../lib/layout';
 import { computeUnions } from '../lib/unions';
+import { resolveMarriedIn } from '../lib/marriage';
 import { PersonNode, type PersonNodeData } from './PersonNode';
 import { JunctionNode, JUNCTION_SIZE } from './JunctionNode';
 import { fullName, type Person } from '../types';
@@ -74,6 +75,19 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     [coupleKeys],
   );
 
+  // Married-in spouses: sit next to their partner; their link to birth parents
+  // is drawn as a thin "origin" line, and the marriage line is forced to run
+  // anchor → mover (left → right) so it stays a clean short connector.
+  const married = useMemo(() => resolveMarriedIn(relationships), [relationships]);
+  const moverIds = useMemo(() => new Set(married.map((m) => m.moverId)), [married]);
+  const relocatedPair = useMemo(() => {
+    const m = new Map<string, { anchor: string; mover: string }>();
+    for (const x of married) {
+      m.set([x.moverId, x.anchorId].sort().join('+'), { anchor: x.anchorId, mover: x.moverId });
+    }
+    return m;
+  }, [married]);
+
   // Sync person nodes from people, preserving existing positions.
   useEffect(() => {
     setNodes((prev) => {
@@ -124,14 +138,15 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   useEffect(() => {
     const next: Edge[] = [];
 
-    // marriage lines — soft bezier so cross-branch marriages curve nicely
-    // instead of cutting a hard diagonal across the canvas.
+    // marriage lines — soft bezier. For a relocated couple, force anchor → mover
+    // direction so the line is a clean short connector between adjacent cards.
     for (const r of relationships) {
       if (r.type !== 'spouse') continue;
+      const rel = relocatedPair.get([r.aId, r.bId].sort().join('+'));
       next.push({
         id: r.id,
-        source: r.aId,
-        target: r.bId,
+        source: rel ? rel.anchor : r.aId,
+        target: rel ? rel.mover : r.bId,
         sourceHandle: 'right',
         targetHandle: 'left',
         type: 'default',
@@ -139,6 +154,13 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
         style: { stroke: CRIMSON, strokeWidth: 2, strokeDasharray: '5 5' },
       });
     }
+
+    // A child that is a married-in spouse: its link to birth parents is a thin,
+    // faint "origin" line so it doesn't compete with the main family lines.
+    const childStyle = (childId: string, base: Record<string, unknown>) =>
+      moverIds.has(childId)
+        ? { stroke: '#b3ada3', strokeWidth: 1.5, strokeDasharray: '2 5', opacity: 0.7 }
+        : base;
 
     // parent → child links
     for (const u of unions) {
@@ -153,13 +175,18 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
             targetHandle: 'top',
             type: 'smoothstep',
             pathOptions: { borderRadius: 16 },
-            style: { stroke: ORANGE, strokeWidth: 2 },
+            style: childStyle(childId, { stroke: ORANGE, strokeWidth: 2 }),
           } as Edge);
         }
       } else {
         // single parent (solid) or con riêng / non-couple parents (dashed):
         // a separate line straight from each parent to each child.
         const dashed = u.parentIds.length >= 2;
+        const base = {
+          stroke: ORANGE,
+          strokeWidth: 2,
+          ...(dashed ? { strokeDasharray: '6 5', opacity: 0.85 } : {}),
+        };
         for (const parentId of u.parentIds) {
           for (const childId of u.childIds) {
             next.push({
@@ -170,11 +197,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
               targetHandle: 'top',
               type: 'smoothstep',
               pathOptions: { borderRadius: 16 },
-              style: {
-                stroke: ORANGE,
-                strokeWidth: 2,
-                ...(dashed ? { strokeDasharray: '6 5', opacity: 0.85 } : {}),
-              },
+              style: childStyle(childId, base),
             } as Edge);
           }
         }
@@ -182,7 +205,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     }
 
     setEdges(next);
-  }, [relationships, unions, isCoupleUnion, setEdges]);
+  }, [relationships, unions, isCoupleUnion, moverIds, relocatedPair, setEdges]);
 
   const doLayout = useCallback(() => {
     const positioned = layoutTree(people, relationships);
