@@ -6,6 +6,30 @@ export interface MarriedIn {
 }
 
 /**
+ * Ids of every spouse who married INTO the family (dâu / rể) — i.e. their own
+ * birth parents are not in the tree. For each spouse pair we tag the partner
+ * without parent links; when neither has parents (e.g. the top couple) we tag
+ * `bId`, matching the relocation preference in {@link resolveMarriedIn}. The
+ * dâu-vs-rể wording is decided later from the person's gender.
+ */
+export function marriedInIds(relationships: Relationship[]): Set<string> {
+  const hasParents = (id: string) =>
+    relationships.some((r) => r.type === 'parent' && r.childId === id);
+
+  const ids = new Set<string>();
+  for (const r of relationships) {
+    if (r.type !== 'spouse') continue;
+    const aP = hasParents(r.aId);
+    const bP = hasParents(r.bId);
+    if (aP && bP) continue; // both rooted in the tree → neither "married in"
+    if (aP) ids.add(r.bId);
+    else if (bP) ids.add(r.aId);
+    else ids.add(r.bId); // neither rooted → second-added is the in-married one
+  }
+  return ids;
+}
+
+/**
  * Decide which spouse of each "cross-family" marriage should be drawn next to
  * their partner. A couple that already shares children is grouped by dagre, so
  * we skip those. For the rest we relocate the leaf spouse (no descendants) so we

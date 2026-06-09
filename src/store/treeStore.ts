@@ -1,8 +1,20 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { nanoid } from 'nanoid';
 import type { Person, Relationship, RelationshipInput, FamilyTreeFile } from '../types';
 import { sampleData } from '../lib/sample';
+import { getSharedTreeName, isReadOnly } from '../lib/shareLink';
+
+// When viewing a shared tree (`?tree=...`), persistence is disabled so the
+// shared data never clobbers the user's locally-saved draft.
+const isSharedView = getSharedTreeName() !== null;
+// Locked view (shared tree without the `&edit` flag): editing UI is hidden.
+const readOnly = isReadOnly();
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
 
 interface TreeState {
   people: Person[];
@@ -12,11 +24,19 @@ interface TreeState {
   dark: boolean;
   layoutTick: number;
   pngTick: number;
+  /** Locked view (shared tree without `&edit`): all editing UI is hidden. */
+  readOnly: boolean;
+  /** Show a "Dâu" / "Rể" tag on married-in spouses. */
+  showInLaw: boolean;
+  /** 'tree' = horizontal node-link; 'vertical' = indented from generation 3. */
+  layoutMode: 'tree' | 'vertical';
 
   // selection / ui
   setSelected: (id: string | null) => void;
   setSearch: (q: string) => void;
   toggleDark: () => void;
+  toggleInLaw: () => void;
+  toggleLayoutMode: () => void;
   requestLayout: () => void;
   requestPng: () => void;
 
@@ -69,10 +89,20 @@ export const useTreeStore = create<TreeState>()(
       dark: false,
       layoutTick: 0,
       pngTick: 0,
+      readOnly,
+      showInLaw: true,
+      layoutMode: 'tree',
 
       setSelected: (id) => set({ selectedId: id }),
       setSearch: (q) => set({ search: q }),
       toggleDark: () => set((s) => ({ dark: !s.dark })),
+      toggleInLaw: () => set((s) => ({ showInLaw: !s.showInLaw })),
+      // switch layout + request a re-layout so positions recompute immediately.
+      toggleLayoutMode: () =>
+        set((s) => ({
+          layoutMode: s.layoutMode === 'tree' ? 'vertical' : 'tree',
+          layoutTick: s.layoutTick + 1,
+        })),
       requestLayout: () => set((s) => ({ layoutTick: s.layoutTick + 1 })),
       requestPng: () => set((s) => ({ pngTick: s.pngTick + 1 })),
 
@@ -122,10 +152,13 @@ export const useTreeStore = create<TreeState>()(
     }),
     {
       name: 'family-tree-v1',
+      storage: createJSONStorage(() => (isSharedView ? noopStorage : localStorage)),
       partialize: (s) => ({
         people: s.people,
         relationships: s.relationships,
         dark: s.dark,
+        showInLaw: s.showInLaw,
+        layoutMode: s.layoutMode,
       }),
     },
   ),

@@ -2,7 +2,7 @@ import Dagre from '@dagrejs/dagre';
 import type { Person, Relationship } from '../types';
 import { resolveMarriedIn } from './marriage';
 
-export const NODE_WIDTH = 210;
+export const NODE_WIDTH = 260;
 export const NODE_HEIGHT = 96;
 
 export interface Positioned {

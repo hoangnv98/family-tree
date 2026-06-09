@@ -13,9 +13,15 @@ import {
   RotateCcw,
   Eraser,
   X,
+  Pencil,
+  Lock,
+  Tags,
+  Network,
+  ListTree,
 } from 'lucide-react';
 import { useTreeStore } from '../store/treeStore';
 import { buildFile, downloadJson, readFile } from '../lib/io';
+import { editUrl } from '../lib/shareLink';
 
 function IconButton({
   onClick,
@@ -48,12 +54,17 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   const dark = useTreeStore((s) => s.dark);
   const setSearch = useTreeStore((s) => s.setSearch);
   const toggleDark = useTreeStore((s) => s.toggleDark);
+  const showInLaw = useTreeStore((s) => s.showInLaw);
+  const toggleInLaw = useTreeStore((s) => s.toggleInLaw);
+  const layoutMode = useTreeStore((s) => s.layoutMode);
+  const toggleLayoutMode = useTreeStore((s) => s.toggleLayoutMode);
   const requestLayout = useTreeStore((s) => s.requestLayout);
   const requestPng = useTreeStore((s) => s.requestPng);
   const addPerson = useTreeStore((s) => s.addPerson);
   const loadFile = useTreeStore((s) => s.loadFile);
   const resetToSample = useTreeStore((s) => s.resetToSample);
   const clearAll = useTreeStore((s) => s.clearAll);
+  const readOnly = useTreeStore((s) => s.readOnly);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [menu, setMenu] = useState(false);
@@ -98,14 +109,31 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
 
           <div className="mx-1 h-6 w-px bg-ink/10 dark:bg-white/10" />
 
-          {/* primary add */}
-          <button
-            onClick={() => onEdit(addPerson({ firstName: 'Thành viên mới' }))}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent/90"
-          >
-            <UserPlus className="h-4 w-4" />
-            <span className="hidden sm:block">Thêm</span>
-          </button>
+          {/* primary add — replaced by a "view-only" badge + edit link when locked */}
+          {readOnly ? (
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 rounded-lg bg-surface-200 px-3 py-2 text-sm font-medium text-ink/60 dark:bg-surface-400 dark:text-white/60">
+                <Lock className="h-4 w-4" />
+                <span className="hidden sm:block">Chỉ xem</span>
+              </span>
+              <a
+                href={editUrl()}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent/90"
+                title="Mở chế độ chỉnh sửa"
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="hidden sm:block">Chỉnh sửa</span>
+              </a>
+            </div>
+          ) : (
+            <button
+              onClick={() => onEdit(addPerson({ firstName: 'Thành viên mới' }))}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent/90"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span className="hidden sm:block">Thêm</span>
+            </button>
+          )}
 
           {/* search */}
           <div className="relative ml-1 flex-1">
@@ -131,9 +159,26 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
           <IconButton onClick={requestLayout} title="Sắp xếp tự động">
             <LayoutGrid className="h-5 w-5" />
           </IconButton>
-          <IconButton onClick={() => fileRef.current?.click()} title="Nhập JSON">
-            <Upload className="h-5 w-5" />
+          <IconButton
+            onClick={toggleLayoutMode}
+            active={layoutMode === 'vertical'}
+            title={
+              layoutMode === 'vertical'
+                ? 'Xem dạng cây (ngang)'
+                : 'Xem dạng dọc (thụt dòng từ đời 3)'
+            }
+          >
+            {layoutMode === 'vertical' ? (
+              <Network className="h-5 w-5" />
+            ) : (
+              <ListTree className="h-5 w-5" />
+            )}
           </IconButton>
+          {!readOnly && (
+            <IconButton onClick={() => fileRef.current?.click()} title="Nhập JSON">
+              <Upload className="h-5 w-5" />
+            </IconButton>
+          )}
           <IconButton onClick={onExport} title="Xuất JSON">
             <Download className="h-5 w-5" />
           </IconButton>
@@ -146,11 +191,19 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
           >
             <ImageDown className="h-5 w-5" />
           </IconButton>
+          <IconButton
+            onClick={toggleInLaw}
+            active={showInLaw}
+            title={showInLaw ? 'Ẩn nhãn Dâu / Rể' : 'Hiện nhãn Dâu / Rể'}
+          >
+            <Tags className="h-5 w-5" />
+          </IconButton>
           <IconButton onClick={toggleDark} title={dark ? 'Chế độ sáng' : 'Chế độ tối'}>
             {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </IconButton>
 
-          {/* overflow menu */}
+          {/* overflow menu — destructive actions, hidden in locked view */}
+          {!readOnly && (
           <div className="relative">
             <IconButton onClick={() => setMenu((v) => !v)} title="Thêm" active={menu}>
               <MoreHorizontal className="h-5 w-5" />
@@ -195,6 +248,7 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
               </>
             )}
           </div>
+          )}
 
           <input
             ref={fileRef}

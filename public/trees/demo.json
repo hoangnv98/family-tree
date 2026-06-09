@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "meta": {
+    "name": "Cây gia phả mẫu (chia sẻ qua URL)",
+    "exportedAt": "2026-06-09T00:00:00.000Z"
+  },
+  "people": [
+    {
+      "id": "demo-ong",
+      "firstName": "Quang Vinh",
+      "lastName": "Trần",
+      "gender": "male",
+      "birthYear": 1940
+    },
+    {
+      "id": "demo-ba",
+      "firstName": "Như Hoa",
+      "lastName": "Lê",
+      "gender": "female",
+      "birthYear": 1944
+    },
+    {
+      "id": "demo-con",
+      "firstName": "Văn Phú",
+      "lastName": "Trần",
+      "gender": "male",
+      "birthYear": 1968
+    }
+  ],
+  "relationships": [
+    { "id": "demo-r1", "type": "spouse", "aId": "demo-ong", "bId": "demo-ba" },
+    { "id": "demo-r2", "type": "parent", "parentId": "demo-ong", "childId": "demo-con" },
+    { "id": "demo-r3", "type": "parent", "parentId": "demo-ba", "childId": "demo-con" }
+  ]
+}

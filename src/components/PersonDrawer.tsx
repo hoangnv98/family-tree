@@ -9,6 +9,7 @@ import {
   Baby,
   UserRound,
   Camera,
+  Lock,
 } from 'lucide-react';
 import { useTreeStore } from '../store/treeStore';
 import { readImageAsDataUrl } from '../lib/io';
@@ -123,6 +124,7 @@ export function PersonDrawer({
   const updatePerson = useTreeStore((s) => s.updatePerson);
   const addRelationship = useTreeStore((s) => s.addRelationship);
   const removeRelationship = useTreeStore((s) => s.removeRelationship);
+  const readOnly = useTreeStore((s) => s.readOnly);
 
   const person = personId ? people.find((p) => p.id === personId) ?? null : null;
   const open = !!person;
@@ -183,13 +185,15 @@ export function PersonDrawer({
               Thông tin thành viên
             </h3>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => onRequestDelete(person.id)}
-                className="rounded-lg p-2 text-ink/50 hover:bg-crimson/10 hover:text-crimson dark:text-white/50"
-                title="Xoá thành viên"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => onRequestDelete(person.id)}
+                  className="rounded-lg p-2 text-ink/50 hover:bg-crimson/10 hover:text-crimson dark:text-white/50"
+                  title="Xoá thành viên"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="rounded-lg p-2 text-ink/50 hover:bg-surface-300 dark:text-white/50 dark:hover:bg-white/10"
@@ -200,8 +204,13 @@ export function PersonDrawer({
             </div>
           </div>
 
-          {/* body */}
-          <div className="scroll-thin flex-1 overflow-y-auto px-5 pb-10">
+          {/* body — a disabled fieldset turns the whole form read-only in
+              locked view (inputs + relationship add/remove all greyed out). */}
+          <fieldset
+            disabled={readOnly}
+            className="scroll-thin flex-1 overflow-y-auto border-0 p-0 disabled:opacity-100"
+          >
+          <div className="px-5 pb-10">
             {/* avatar */}
             <div className="mt-5 flex items-center gap-4">
               <div className="relative">
@@ -488,11 +497,21 @@ export function PersonDrawer({
               </Field>
             </div>
           </div>
+          </fieldset>
 
           {/* footer hint */}
           <div className="border-t border-ink/10 px-5 py-3 text-xs text-ink/40 dark:border-white/10 dark:text-white/40">
-            <Upload className="mr-1 inline h-3 w-3" />
-            Mọi thay đổi được lưu tự động vào trình duyệt.
+            {readOnly ? (
+              <>
+                <Lock className="mr-1 inline h-3 w-3" />
+                Đang xem ở chế độ chỉ đọc.
+              </>
+            ) : (
+              <>
+                <Upload className="mr-1 inline h-3 w-3" />
+                Mọi thay đổi được lưu tự động vào trình duyệt.
+              </>
+            )}
           </div>
         </>
       )}

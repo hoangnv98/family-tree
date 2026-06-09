@@ -6,6 +6,9 @@ import { fullName, lifespan, type Person } from '../types';
 export interface PersonNodeData {
   person: Person;
   dimmed: boolean;
+  readOnly?: boolean;
+  /** "Dâu" / "Rể" tag for married-in spouses; null when not shown. */
+  inLawRole?: 'Dâu' | 'Rể' | null;
   [key: string]: unknown;
 }
 
@@ -26,13 +29,13 @@ const handleCls = (color: string) =>
   `!h-2 !w-2 ${color} !opacity-0 transition-opacity group-hover:!opacity-100`;
 
 function PersonNodeComponent({ data, selected }: NodeProps) {
-  const { person, dimmed } = data as PersonNodeData;
+  const { person, dimmed, readOnly, inLawRole } = data as PersonNodeData;
   const span = lifespan(person);
 
   return (
     <div
       className={[
-        'group relative flex w-[210px] items-center gap-3 rounded-brand border bg-white/90 px-3 py-2.5 shadow-card backdrop-blur transition',
+        'group relative flex w-[260px] items-center gap-3 rounded-brand border bg-white/90 px-3 py-2.5 shadow-card backdrop-blur transition',
         'dark:bg-surface-500/90 dark:border-white/10',
         selected ? 'border-accent ring-2 ring-accent/40' : 'border-ink/10',
         dimmed ? 'opacity-30' : 'opacity-100',
@@ -56,14 +59,27 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
 
       {/* text */}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-ink dark:text-white">
-          {fullName(person)}
+        <div className="flex items-start gap-1.5">
+          <div className="flex-1 break-words text-sm font-semibold text-ink dark:text-white">
+            {fullName(person)}
+          </div>
+          {inLawRole && (
+            <span
+              className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                inLawRole === 'Dâu'
+                  ? 'bg-female/15 text-female'
+                  : 'bg-male/15 text-male'
+              }`}
+            >
+              {inLawRole}
+            </span>
+          )}
         </div>
         {span && (
           <div className="text-xs text-ink/50 dark:text-white/50">{span}</div>
         )}
         {person.occupation && (
-          <div className="truncate text-xs text-ink/40 dark:text-white/40">
+          <div className="break-words text-xs text-ink/40 dark:text-white/40">
             {person.occupation}
           </div>
         )}
@@ -71,11 +87,16 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
 
       {/* connection handles — top/bottom = parent↓child, left/right = spouse.
           Hidden until the card is hovered so deleted links don't leave stray
-          dots that look like leftover connections. */}
-      <Handle id="top" type="target" position={Position.Top} className={handleCls('!bg-accent/70')} />
-      <Handle id="bottom" type="source" position={Position.Bottom} className={handleCls('!bg-accent/70')} />
-      <Handle id="left" type="target" position={Position.Left} className={handleCls('!bg-female/70')} />
-      <Handle id="right" type="source" position={Position.Right} className={handleCls('!bg-female/70')} />
+          dots that look like leftover connections. Omitted entirely in the
+          locked (read-only) view since no links can be made. */}
+      {!readOnly && (
+        <>
+          <Handle id="top" type="target" position={Position.Top} className={handleCls('!bg-accent/70')} />
+          <Handle id="bottom" type="source" position={Position.Bottom} className={handleCls('!bg-accent/70')} />
+          <Handle id="left" type="target" position={Position.Left} className={handleCls('!bg-female/70')} />
+          <Handle id="right" type="source" position={Position.Right} className={handleCls('!bg-female/70')} />
+        </>
+      )}
     </div>
   );
 }

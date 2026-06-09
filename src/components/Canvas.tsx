@@ -19,8 +19,9 @@ import {
 import { toPng } from 'html-to-image';
 import { useTreeStore } from '../store/treeStore';
 import { layoutTree, NODE_WIDTH, NODE_HEIGHT } from '../lib/layout';
+import { layoutTreeVertical } from '../lib/layoutVertical';
 import { computeUnions } from '../lib/unions';
-import { resolveMarriedIn } from '../lib/marriage';
+import { resolveMarriedIn, marriedInIds } from '../lib/marriage';
 import { PersonNode, type PersonNodeData } from './PersonNode';
 import { JunctionNode, JUNCTION_SIZE } from './JunctionNode';
 import { fullName, type Person } from '../types';
@@ -51,6 +52,9 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   const setSelected = useTreeStore((s) => s.setSelected);
   const addRelationship = useTreeStore((s) => s.addRelationship);
   const removeRelationship = useTreeStore((s) => s.removeRelationship);
+  const readOnly = useTreeStore((s) => s.readOnly);
+  const showInLaw = useTreeStore((s) => s.showInLaw);
+  const layoutMode = useTreeStore((s) => s.layoutMode);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -58,6 +62,10 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   const didInit = useRef(false);
 
   const unions = useMemo(() => computeUnions(relationships), [relationships]);
+
+  // Married-in spouses (dâu / rể). The label itself is decided per-person from
+  // gender at render time.
+  const inLaw = useMemo(() => marriedInIds(relationships), [relationships]);
 
   // Parent-pairs that are an actual married couple (have a spouse link). Only
   // these get a shared junction knot; other multi-parent children (con riêng)
@@ -99,11 +107,24 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
           type: 'person',
           position: existing?.position ?? { x: 100, y: 100 },
           selected: p.id === selectedId,
-          data: { person: p, dimmed: search.trim() ? !matches(p, search) : false },
+          draggable: !readOnly,
+          data: {
+            person: p,
+            dimmed: search.trim() ? !matches(p, search) : false,
+            readOnly,
+            inLawRole:
+              showInLaw && inLaw.has(p.id)
+                ? p.gender === 'female'
+                  ? 'Dâu'
+                  : p.gender === 'male'
+                    ? 'Rể'
+                    : null
+                : null,
+          },
         } as Node<PersonNodeData>;
       });
     });
-  }, [people, search, selectedId, setNodes]);
+  }, [people, search, selectedId, setNodes, readOnly, showInLaw, inLaw]);
 
   // Derive junction "knot" nodes from the live person positions (one per couple
   // with children). They are not stored in state — they follow the parents.
@@ -208,7 +229,10 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
   }, [relationships, unions, isCoupleUnion, moverIds, relocatedPair, setEdges]);
 
   const doLayout = useCallback(() => {
-    const positioned = layoutTree(people, relationships);
+    const positioned =
+      layoutMode === 'vertical'
+        ? layoutTreeVertical(people, relationships)
+        : layoutTree(people, relationships);
     const map = new Map(positioned.map((p) => [p.id, p]));
     setNodes((prev) =>
       prev.map((n) => {
@@ -217,7 +241,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       }),
     );
     requestAnimationFrame(() => fitView({ padding: 0.2, duration: 400 }));
-  }, [people, relationships, setNodes, fitView]);
+  }, [people, relationships, setNodes, fitView, layoutMode]);
 
   // Layout once on first mount, and whenever the toolbar requests it.
   useEffect(() => {
@@ -289,6 +313,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
 
   const onConnect = useCallback(
     (c: Connection) => {
+      if (readOnly) return;
       if (!c.source || !c.target || c.source === c.target) return;
       // ignore connections involving junction nodes
       if (c.source.startsWith('u_') || c.target.startsWith('u_')) return;
@@ -300,11 +325,12 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       if (spouse) addRelationship({ type: 'spouse', aId: c.source, bId: c.target });
       else addRelationship({ type: 'parent', parentId: c.source, childId: c.target });
     },
-    [addRelationship],
+    [addRelationship, readOnly],
   );
 
   const onEdgesDelete = useCallback(
-    (deleted: Edge[]) =>
+    (deleted: Edge[]) => {
+      if (readOnly) return;
       deleted.forEach((e) => {
         if (e.source.startsWith('u_')) {
           // couple junction → child: detach the child from both parents
@@ -326,8 +352,9 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
         }
         // otherwise it's a marriage line — edge id is the spouse relationship id
         removeRelationship(e.id);
-      }),
-    [removeRelationship, relationships],
+      });
+    },
+    [removeRelationship, relationships, readOnly],
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -358,8 +385,10 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       colorMode={dark ? 'dark' : 'light'}
       fitView
       minZoom={0.2}
+      nodesConnectable={!readOnly}
+      nodesDraggable={!readOnly}
       proOptions={{ hideAttribution: true }}
-      defaultEdgeOptions={{ deletable: true }}
+      defaultEdgeOptions={{ deletable: !readOnly }}
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color={minimapColor} />
       <Controls showInteractive={false} className="!shadow-float" />
