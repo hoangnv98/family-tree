@@ -1,6 +1,7 @@
 import Dagre from '@dagrejs/dagre';
 import type { Person, Relationship } from '../types';
 import { resolveMarriedIn } from './marriage';
+import { computeGenerations } from './generations';
 
 export const NODE_WIDTH = 260;
 export const NODE_HEIGHT = 96;
@@ -27,11 +28,18 @@ export function layoutTree(
   people: Person[],
   relationships: Relationship[],
 ): Positioned[] {
+  // Generation 3+ (cháu) uses the narrow portrait card, so size each node by its
+  // generation. Siblings still share a rank (same đời / row); the row is just
+  // more compact because the cards are narrow.
+  const genOf = computeGenerations(people, relationships);
+  const wOf = (id: string) => ((genOf.get(id) ?? 1) >= 3 ? NODE_WIDTH_COMPACT : NODE_WIDTH);
+  const hOf = (id: string) => ((genOf.get(id) ?? 1) >= 3 ? NODE_HEIGHT_COMPACT : NODE_HEIGHT);
+
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 90, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 80, marginx: 40, marginy: 40 });
 
   for (const p of people) {
-    g.setNode(p.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    g.setNode(p.id, { width: wOf(p.id), height: hOf(p.id) });
   }
 
   for (const r of relationships) {
@@ -47,8 +55,10 @@ export function layoutTree(
     const n = g.node(p.id);
     if (!n) continue;
     // dagre gives center coords; React Flow expects top-left.
-    pos.set(p.id, { id: p.id, x: n.x - NODE_WIDTH / 2, y: n.y - NODE_HEIGHT / 2 });
+    pos.set(p.id, { id: p.id, x: n.x - wOf(p.id) / 2, y: n.y - hOf(p.id) / 2 });
   }
+
+  const GAP = 40;
 
   // Second pass: seat each "married-in" spouse right next to their partner,
   // shifting that row's right-hand neighbours to make room. Their link back to
@@ -57,11 +67,12 @@ export function layoutTree(
     const anchor = pos.get(anchorId);
     const mover = pos.get(moverId);
     if (!anchor || !mover) continue;
-    const targetX = anchor.x + NODE_WIDTH + 50;
+    const targetX = anchor.x + wOf(anchorId) + GAP;
+    const shift = wOf(moverId) + GAP;
     for (const p of pos.values()) {
       if (p.id === moverId || p.id === anchorId) continue;
       if (Math.abs(p.y - anchor.y) < 1 && p.x >= targetX - 1) {
-        p.x += NODE_WIDTH + 50;
+        p.x += shift;
       }
     }
     mover.x = targetX;
@@ -71,7 +82,6 @@ export function layoutTree(
   // Third pass: make sure every monogamous couple sits side by side, even
   // cross-branch spouses that dagre left apart. Multi-spouse people (vợ 2) are
   // skipped — a husband can't be adjacent to two wives at once.
-  const GAP = 50;
   const spouseCount = new Map<string, number>();
   for (const r of relationships)
     if (r.type === 'spouse') {
@@ -89,16 +99,18 @@ export function layoutTree(
     // keep the partner that carries the children as the anchor
     const anchor = hasKids(r.bId) && !hasKids(r.aId) ? b : a;
     const mover = anchor === a ? b : a;
-    const targetX = anchor.x + NODE_WIDTH + GAP;
+    const targetX = anchor.x + wOf(anchor.id) + GAP;
+    const shift = wOf(mover.id) + GAP;
     // already adjacent (either side)?
     if (
       Math.abs(mover.y - anchor.y) < 2 &&
-      (Math.abs(mover.x - targetX) < 2 || Math.abs(mover.x - (anchor.x - NODE_WIDTH - GAP)) < 2)
+      (Math.abs(mover.x - targetX) < 2 ||
+        Math.abs(mover.x - (anchor.x - wOf(mover.id) - GAP)) < 2)
     )
       continue;
     for (const p of pos.values()) {
       if (p.id === mover.id || p.id === anchor.id) continue;
-      if (Math.abs(p.y - anchor.y) < 1 && p.x >= targetX - 1) p.x += NODE_WIDTH + GAP;
+      if (Math.abs(p.y - anchor.y) < 1 && p.x >= targetX - 1) p.x += shift;
     }
     mover.x = targetX;
     mover.y = anchor.y;

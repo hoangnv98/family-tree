@@ -20,12 +20,12 @@ import {
 import { toPng } from 'html-to-image';
 import { useTreeStore } from '../store/treeStore';
 import {
+  layoutTree,
   NODE_WIDTH,
   NODE_HEIGHT,
   NODE_WIDTH_COMPACT,
   NODE_HEIGHT_COMPACT,
 } from '../lib/layout';
-import { layoutTreeVertical } from '../lib/layoutVertical';
 import { computeGenerations } from '../lib/generations';
 import { computeUnions } from '../lib/unions';
 import { resolveMarriedIn, marriedInIds } from '../lib/marriage';
@@ -280,32 +280,6 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
       const aMale = genderOf.get(r.aId) === 'male';
       const bMale = genderOf.get(r.bId) === 'male';
 
-      // "Vợ 2": the layout stacks the wives under the husband, so the marriage
-      // line drops from his bottom to each wife's top (a clean vertical branch).
-      const husbandId =
-        (spouseCount.get(r.aId) ?? 0) >= 2
-          ? r.aId
-          : (spouseCount.get(r.bId) ?? 0) >= 2
-            ? r.bId
-            : null;
-      if (husbandId) {
-        next.push({
-          id: r.id,
-          source: husbandId,
-          target: husbandId === r.aId ? r.bId : r.aId,
-          sourceHandle: 'bottom',
-          targetHandle: 'top',
-          type: 'smoothstep',
-          pathOptions: { borderRadius: 16 },
-          selectable: true,
-          style: applyHover(
-            { stroke: CRIMSON, strokeWidth: 2, strokeDasharray: '5 5' },
-            { spouse: [r.aId, r.bId] },
-          ),
-        } as Edge);
-        continue;
-      }
-
       // Side-by-side couple: husband (male) on the left, line runs left→right.
       let source = r.aId;
       let target = r.bId;
@@ -407,7 +381,7 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   }, [relationships, unions, isCoupleUnion, isMultiWifeUnion, motherOf, moverIds, relocatedPair, genderOf, spouseCount, hoveredId, setEdges]);
 
   const doLayout = useCallback(() => {
-    const positioned = layoutTreeVertical(people, relationships);
+    const positioned = layoutTree(people, relationships);
     const map = new Map(positioned.map((p) => [p.id, p]));
     setNodes((prev) =>
       prev.map((n) => {
