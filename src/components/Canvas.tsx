@@ -478,9 +478,28 @@ function Flow({ onEdit, onRequestDelete }: CanvasProps) {
   const onNodeDragStop: OnNodeDrag<Node> = useCallback(
     (_, node) => {
       if (node.type !== 'person') return;
-      setPosition(node.id, node.position.x, node.position.y);
+      // Snap the dropped node onto the nearest existing row (within a threshold)
+      // so siblings stay aligned even when pulled far apart horizontally. Drag
+      // far up/down (beyond the threshold) to intentionally start a new row.
+      const SNAP_Y = 60;
+      let y = node.position.y;
+      let best = SNAP_Y;
+      for (const o of getNodes()) {
+        if (o.type !== 'person' || o.id === node.id) continue;
+        const d = Math.abs(o.position.y - y);
+        if (d <= best) {
+          best = d;
+          y = o.position.y;
+        }
+      }
+      setPosition(node.id, node.position.x, y);
+      if (y !== node.position.y) {
+        setNodes((prev) =>
+          prev.map((n) => (n.id === node.id ? { ...n, position: { x: node.position.x, y } } : n)),
+        );
+      }
     },
-    [setPosition],
+    [getNodes, setNodes, setPosition],
   );
 
   const minimapColor = useMemo(
