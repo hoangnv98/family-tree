@@ -1,35 +1,228 @@
 {
   "version": 1,
   "meta": {
-    "name": "Cây gia phả mẫu (chia sẻ qua URL)",
-    "exportedAt": "2026-06-09T00:00:00.000Z"
+    "name": "Cây gia phả",
+    "exportedAt": "2026-06-09T07:17:22.560Z"
   },
   "people": [
     {
-      "id": "demo-ong",
-      "firstName": "Quang Vinh",
-      "lastName": "Trần",
+      "id": "p1",
+      "firstName": "",
+      "lastName": "Bố Luyến",
       "gender": "male",
-      "birthYear": 1940
+      "birthYear": 1976,
+      "bio": "Ông bố của gia đình, người gây dựng nề nếp gia phong.",
+      "occupation": "Mộc",
+      "birthPlace": "Hà Nam"
     },
     {
-      "id": "demo-ba",
-      "firstName": "Như Hoa",
-      "lastName": "Lê",
+      "id": "p2",
+      "firstName": "",
+      "lastName": "Mẹ Xuân",
       "gender": "female",
-      "birthYear": 1944
+      "birthYear": 1981,
+      "occupation": "Nội trợ",
+      "birthPlace": "Thái Bình"
     },
     {
-      "id": "demo-con",
-      "firstName": "Văn Phú",
+      "id": "p3",
+      "firstName": "Thu Hương",
+      "lastName": "Trần Thị",
+      "gender": "female",
+      "birthYear": 2003,
+      "phone": "0901 234 567",
+      "email": "",
+      "occupation": "Marketing"
+    },
+    {
+      "id": "p4",
+      "firstName": "Hải",
       "lastName": "Trần",
+      "gender": "female",
+      "birthYear": 2010,
+      "occupation": "Họa sĩ"
+    },
+    {
+      "id": "HJCwKGCy",
+      "firstName": "Nga",
+      "lastName": "Nguyễn Thị",
+      "gender": "female",
+      "birthYear": 1980,
+      "occupation": "Kinh doanh"
+    },
+    {
+      "id": "mqP2UDvj",
+      "firstName": "Bích Ngọc",
+      "lastName": "Nguyễn Thị",
+      "gender": "female"
+    },
+    {
+      "id": "c3pFItuJ",
+      "firstName": "Việt Anh",
+      "lastName": "Nguyễn",
       "gender": "male",
-      "birthYear": 1968
+      "birthYear": 1977
+    },
+    {
+      "id": "zFEtreFR",
+      "firstName": "Việt Hoàng",
+      "lastName": "Nguyễn",
+      "gender": "male",
+      "birthYear": 1998,
+      "events": []
+    },
+    {
+      "id": "xkmkTQ0E",
+      "firstName": "Kim Ngân",
+      "lastName": "Nguyễn Thị",
+      "gender": "female",
+      "birthYear": 2010
+    },
+    {
+      "id": "730WVKoF",
+      "firstName": "Long",
+      "lastName": "Trần",
+      "gender": "male"
+    },
+    {
+      "id": "C4IH5tBi",
+      "firstName": "Luân",
+      "lastName": "Trần",
+      "gender": "male"
+    },
+    {
+      "id": "oyYTb_Sy",
+      "firstName": "Lâm",
+      "lastName": "Trần",
+      "gender": "other"
+    },
+    {
+      "id": "TaidNpvg",
+      "firstName": "Nam",
+      "lastName": "Trần",
+      "gender": "other"
+    },
+    {
+      "id": "fjQcyVXB",
+      "firstName": "Tuấn Anh",
+      "lastName": "Trần",
+      "gender": "other"
+    },
+    {
+      "id": "3oAiR1Np",
+      "firstName": "Nghĩa",
+      "lastName": "Trần",
+      "gender": "male"
+    },
+    {
+      "id": "-l0RB2la",
+      "firstName": "Trang",
+      "lastName": "Chị",
+      "gender": "other"
     }
   ],
   "relationships": [
-    { "id": "demo-r1", "type": "spouse", "aId": "demo-ong", "bId": "demo-ba" },
-    { "id": "demo-r2", "type": "parent", "parentId": "demo-ong", "childId": "demo-con" },
-    { "id": "demo-r3", "type": "parent", "parentId": "demo-ba", "childId": "demo-con" }
+    {
+      "id": "r1",
+      "type": "spouse",
+      "aId": "p1",
+      "bId": "p2"
+    },
+    {
+      "id": "r3",
+      "type": "parent",
+      "parentId": "p1",
+      "childId": "p3"
+    },
+    {
+      "id": "r4",
+      "type": "parent",
+      "parentId": "p2",
+      "childId": "p3"
+    },
+    {
+      "id": "LsbgDtqb",
+      "type": "parent",
+      "parentId": "p1",
+      "childId": "p4"
+    },
+    {
+      "id": "N4aEya9A",
+      "type": "parent",
+      "parentId": "p2",
+      "childId": "p4"
+    },
+    {
+      "id": "tcNeZKgJ",
+      "type": "parent",
+      "parentId": "HJCwKGCy",
+      "childId": "mqP2UDvj"
+    },
+    {
+      "id": "LeAyJA0w",
+      "type": "spouse",
+      "aId": "c3pFItuJ",
+      "bId": "HJCwKGCy"
+    },
+    {
+      "id": "wd9i3p3o",
+      "type": "parent",
+      "parentId": "HJCwKGCy",
+      "childId": "zFEtreFR"
+    },
+    {
+      "id": "Fj8qsiLg",
+      "type": "parent",
+      "parentId": "c3pFItuJ",
+      "childId": "zFEtreFR"
+    },
+    {
+      "id": "Obk0xS06",
+      "type": "parent",
+      "parentId": "c3pFItuJ",
+      "childId": "mqP2UDvj"
+    },
+    {
+      "id": "QNR2XDA6",
+      "type": "parent",
+      "parentId": "c3pFItuJ",
+      "childId": "xkmkTQ0E"
+    },
+    {
+      "id": "cCcMbXEo",
+      "type": "parent",
+      "parentId": "HJCwKGCy",
+      "childId": "xkmkTQ0E"
+    },
+    {
+      "id": "h6VK0ZRp",
+      "type": "spouse",
+      "aId": "zFEtreFR",
+      "bId": "p3"
+    },
+    {
+      "type": "parent",
+      "parentId": "oyYTb_Sy",
+      "childId": "TaidNpvg",
+      "id": "STXf4KPp"
+    },
+    {
+      "type": "parent",
+      "parentId": "oyYTb_Sy",
+      "childId": "fjQcyVXB",
+      "id": "1g_fPjVM"
+    },
+    {
+      "type": "parent",
+      "parentId": "C4IH5tBi",
+      "childId": "3oAiR1Np",
+      "id": "kZiVGftB"
+    },
+    {
+      "type": "spouse",
+      "aId": "-l0RB2la",
+      "bId": "3oAiR1Np",
+      "id": "apZ8U2e0"
+    }
   ]
 }

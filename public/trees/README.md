@@ -1,18 +1,19 @@
-# Cây gia phả chia sẻ qua URL
+# Cây gia phả chia sẻ (`?tree=<id>`)
 
-Mỗi file `<tên>.json` ở đây là một cây gia phả phục vụ qua link khi deploy:
+Mở app với `?tree=<id>` là vào **cây chia sẻ** có id `<id>`. Ai có link cũng
+**sửa được**, và thay đổi **tự lưu lên cloud** (last-write-wins); người khác mở
+hoặc refresh sẽ thấy bản mới.
 
-    https://your-site/?tree=<tên>
+## Dữ liệu nằm ở đâu
+- **Cloud (Upstash Redis / Vercel KV)** là nguồn chính — xem [api/tree.ts](../../api/tree.ts).
+- File `.json` trong thư mục này chỉ là **bản tĩnh đi kèm**, dùng để:
+  - **Seed**: lần đầu mở `?tree=<id>` mà cloud chưa có cây đó, app nạp file này
+    làm dữ liệu khởi đầu; lần sửa đầu tiên sẽ tạo cây trên cloud.
+  - **Fallback chỉ-đọc**: nếu chưa bật lưu trữ cloud, app hiển thị file này ở
+    chế độ chỉ xem.
 
-Ví dụ: `demo.json` → mở bằng `?tree=demo`.
-
-## Thêm cây của bạn
-
-1. Trong app, bấm xuất file (Export) để tải file JSON cây gia phả về.
-2. Đổi tên thành slug an toàn — chỉ chữ thường, số, `-`, `_` (vd `giapha-ho-tran.json`).
-3. Bỏ vào thư mục `public/trees/` này rồi build/deploy lại.
-4. Truy cập `?tree=giapha-ho-tran` để xem.
-
-Khi mở bằng `?tree=...`, dữ liệu được nạp từ file ở đây và **không ghi đè** bản
-nháp đang lưu trong trình duyệt (localStorage). Mở app không kèm tham số vẫn là
-chế độ chỉnh sửa bình thường.
+## Tạo cây chia sẻ
+- Cách nhanh: ở chế độ nháp (mở app không có `?tree=`), bấm nút **Chia sẻ lên
+  cloud** (icon chia sẻ) — app tạo id ngẫu nhiên, đẩy cây hiện tại lên cloud rồi
+  mở link chia sẻ.
+- Hoặc tự đặt id: mở `?tree=ten-tuy-y` (chữ thường/số/`-`/`_`) rồi bắt đầu sửa.

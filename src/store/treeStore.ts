@@ -3,13 +3,15 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { nanoid } from 'nanoid';
 import type { Person, Relationship, RelationshipInput, FamilyTreeFile } from '../types';
 import { sampleData } from '../lib/sample';
-import { getSharedTreeName, isReadOnly } from '../lib/shareLink';
+import { getSharedTreeName } from '../lib/shareLink';
 
 // When viewing a shared tree (`?tree=...`), persistence is disabled so the
 // shared data never clobbers the user's locally-saved draft.
 const isSharedView = getSharedTreeName() !== null;
-// Locked view (shared tree without the `&edit` flag): editing UI is hidden.
-const readOnly = isReadOnly();
+// A shared tree starts locked; CloudSync unlocks it once it confirms the cloud
+// store is on (so anyone with the link can edit). If the cloud is off we keep
+// it read-only and fall back to the bundled static file.
+const readOnly = isSharedView;
 const noopStorage = {
   getItem: () => null,
   setItem: () => {},
@@ -24,14 +26,18 @@ interface TreeState {
   dark: boolean;
   layoutTick: number;
   pngTick: number;
-  /** Locked view (shared tree without `&edit`): all editing UI is hidden. */
+  /** Locked view: editing UI is hidden (shared tree while cloud is off). */
   readOnly: boolean;
+  /** Cloud autosave status for the shared (`?tree=`) editing session. */
+  cloudSave: 'off' | 'idle' | 'saving' | 'saved' | 'error';
   /** Show a "Dâu" / "Rể" tag on married-in spouses. */
   showInLaw: boolean;
   /** 'tree' = horizontal node-link; 'vertical' = indented from generation 3. */
   layoutMode: 'tree' | 'vertical';
 
   // selection / ui
+  setReadOnly: (v: boolean) => void;
+  setCloudSave: (s: TreeState['cloudSave']) => void;
   setSelected: (id: string | null) => void;
   setSearch: (q: string) => void;
   toggleDark: () => void;
@@ -90,9 +96,12 @@ export const useTreeStore = create<TreeState>()(
       layoutTick: 0,
       pngTick: 0,
       readOnly,
+      cloudSave: 'off',
       showInLaw: true,
       layoutMode: 'tree',
 
+      setReadOnly: (v) => set({ readOnly: v }),
+      setCloudSave: (s) => set({ cloudSave: s }),
       setSelected: (id) => set({ selectedId: id }),
       setSearch: (q) => set({ search: q }),
       toggleDark: () => set((s) => ({ dark: !s.dark })),

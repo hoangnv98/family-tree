@@ -13,15 +13,20 @@ import {
   RotateCcw,
   Eraser,
   X,
-  Pencil,
   Lock,
   Tags,
   Network,
   ListTree,
+  Share2,
+  Cloud,
+  CloudOff,
+  Check,
+  Loader2,
 } from 'lucide-react';
 import { useTreeStore } from '../store/treeStore';
 import { buildFile, downloadJson, readFile } from '../lib/io';
-import { editUrl } from '../lib/shareLink';
+import { getSharedTreeName } from '../lib/shareLink';
+import { newTreeId, saveCloudTree } from '../lib/cloud';
 
 function IconButton({
   onClick,
@@ -58,6 +63,9 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
   const toggleInLaw = useTreeStore((s) => s.toggleInLaw);
   const layoutMode = useTreeStore((s) => s.layoutMode);
   const toggleLayoutMode = useTreeStore((s) => s.toggleLayoutMode);
+  const cloudSave = useTreeStore((s) => s.cloudSave);
+
+  const isShared = getSharedTreeName() !== null;
   const requestLayout = useTreeStore((s) => s.requestLayout);
   const requestPng = useTreeStore((s) => s.requestPng);
   const addPerson = useTreeStore((s) => s.addPerson);
@@ -79,6 +87,28 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
     downloadJson(buildFile(people, relationships));
     flash('ok', 'Đã xuất file JSON.');
   };
+
+  // Publish the current draft as a shared cloud tree, then open its link.
+  const onShareToCloud = async () => {
+    flash('ok', 'Đang tạo cây chia sẻ…');
+    const id = newTreeId();
+    const res = await saveCloudTree(id, buildFile(people, relationships, 'Cây gia phả'));
+    if (res.ok) {
+      window.location.search = `?tree=${id}`; // reload into cloud-edit mode
+    } else if (res.disabled) {
+      flash('err', 'Chưa bật lưu trữ đám mây trên Vercel. Xem hướng dẫn để bật.');
+    } else {
+      flash('err', res.error);
+    }
+  };
+
+  const cloudPill = {
+    saving: { icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />, text: 'Đang lưu…' },
+    saved: { icon: <Check className="h-3.5 w-3.5" />, text: 'Đã lưu' },
+    idle: { icon: <Cloud className="h-3.5 w-3.5" />, text: 'Đồng bộ' },
+    error: { icon: <CloudOff className="h-3.5 w-3.5" />, text: 'Lỗi lưu' },
+    off: null,
+  }[cloudSave];
 
   const onImportPick = async (file?: File) => {
     if (!file) return;
@@ -107,24 +137,31 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
             </span>
           </div>
 
+          {cloudPill && (
+            <span
+              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
+                cloudSave === 'error'
+                  ? 'bg-crimson/10 text-crimson'
+                  : 'bg-surface-200 text-ink/60 dark:bg-surface-400 dark:text-white/60'
+              }`}
+              title="Tự lưu lên cloud — ai có link cũng sửa được"
+            >
+              {cloudPill.icon}
+              <span className="hidden sm:block">{cloudPill.text}</span>
+            </span>
+          )}
+
           <div className="mx-1 h-6 w-px bg-ink/10 dark:bg-white/10" />
 
-          {/* primary add — replaced by a "view-only" badge + edit link when locked */}
+          {/* primary add — a "view-only" badge when locked (cloud store is off) */}
           {readOnly ? (
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1.5 rounded-lg bg-surface-200 px-3 py-2 text-sm font-medium text-ink/60 dark:bg-surface-400 dark:text-white/60">
-                <Lock className="h-4 w-4" />
-                <span className="hidden sm:block">Chỉ xem</span>
-              </span>
-              <a
-                href={editUrl()}
-                className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent/90"
-                title="Mở chế độ chỉnh sửa"
-              >
-                <Pencil className="h-4 w-4" />
-                <span className="hidden sm:block">Chỉnh sửa</span>
-              </a>
-            </div>
+            <span
+              className="flex items-center gap-1.5 rounded-lg bg-surface-200 px-3 py-2 text-sm font-medium text-ink/60 dark:bg-surface-400 dark:text-white/60"
+              title="Cây chia sẻ ở chế độ chỉ xem (chưa bật lưu trữ đám mây)"
+            >
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:block">Chỉ xem</span>
+            </span>
           ) : (
             <button
               onClick={() => onEdit(addPerson({ firstName: 'Thành viên mới' }))}
@@ -182,6 +219,11 @@ export function Toolbar({ onEdit }: { onEdit: (id: string) => void }) {
           <IconButton onClick={onExport} title="Xuất JSON">
             <Download className="h-5 w-5" />
           </IconButton>
+          {!isShared && !readOnly && (
+            <IconButton onClick={onShareToCloud} title="Chia sẻ lên cloud (ai có link cũng sửa)">
+              <Share2 className="h-5 w-5" />
+            </IconButton>
+          )}
           <IconButton
             onClick={() => {
               requestPng();
