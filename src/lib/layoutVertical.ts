@@ -67,30 +67,70 @@ export function layoutTreeVertical(
     return sortByOrder(ids).filter((c) => !placed.has(c));
   };
 
+  // Children that `a` and `b` have together (both are parents).
+  const sharedChildren = (a: string, b: string): string[] =>
+    sortByOrder(
+      (childrenOf.get(a) ?? []).filter((c) => (parentsOf.get(c) ?? []).includes(b)),
+    ).filter((c) => !placed.has(c));
+
+  // Stack a list of children vertically from `y`, indented at `x`. Returns the
+  // next free y (bottom) and the rightmost extent.
+  function stackChildren(
+    kids: string[],
+    x: number,
+    y: number,
+  ): { bottom: number; right: number } {
+    let cy = y;
+    let right = x + NODE_WIDTH;
+    for (const k of kids) {
+      const res = place(k, x, cy);
+      right = Math.max(right, res.right);
+      cy = res.bottom + V_GAP;
+    }
+    return { bottom: kids.length ? cy - V_GAP : y - V_GAP, right };
+  }
+
   // Place `id` (blood line) at (x,y) with all descendants indented below it.
+  // One spouse → shown beside; multiple spouses (e.g. vợ 2) → each spouse is a
+  // separate indented branch with her own children, so wives never get tangled.
   function place(id: string, x: number, y: number): { bottom: number; right: number } {
     if (placed.has(id)) return { bottom: y + NODE_HEIGHT, right: x + NODE_WIDTH };
     placed.add(id);
-    const sp = besideSpouse(id);
+    const spouses = (spouseOf.get(id) ?? []).filter((s) => !placed.has(s));
+
+    if (spouses.length >= 2) {
+      // husband alone on top; each wife + her children form an indented branch.
+      pos.set(id, { id, x, y });
+      let right = x + NODE_WIDTH;
+      let cy = y + ROW_STEP;
+      for (const wifeId of sortByOrder(spouses)) {
+        placed.add(wifeId);
+        pos.set(wifeId, { id: wifeId, x: x + INDENT, y: cy });
+        right = Math.max(right, x + INDENT + NODE_WIDTH);
+        const res = stackChildren(sharedChildren(id, wifeId), x + 2 * INDENT, cy + ROW_STEP);
+        right = Math.max(right, res.right);
+        cy = Math.max(res.bottom, cy + NODE_HEIGHT) + V_GAP;
+      }
+      // any of `id`'s children without a co-parent in the tree: under id.
+      const res = stackChildren(unitChildren(id), x + INDENT, cy);
+      right = Math.max(right, res.right);
+      cy = Math.max(res.bottom + V_GAP, cy);
+      return { bottom: cy - V_GAP, right };
+    }
+
+    // 0 or 1 spouse → compact: spouse beside, shared+own children stacked below.
+    const sp = spouses[0];
     const [leftId, rightId] = orderCouple(id, sp);
     pos.set(leftId, { id: leftId, x, y });
     let right = x + NODE_WIDTH;
-
     if (sp && rightId) {
       placed.add(sp);
       const sx = x + NODE_WIDTH + COUPLE_GAP;
       pos.set(rightId, { id: rightId, x: sx, y });
       right = sx + NODE_WIDTH;
     }
-
-    let cy = y + ROW_STEP;
-    const kids = unitChildren(id, sp);
-    for (const k of kids) {
-      const res = place(k, x + INDENT, cy);
-      right = Math.max(right, res.right);
-      cy = res.bottom + V_GAP;
-    }
-    return { bottom: kids.length ? cy - V_GAP : y + NODE_HEIGHT, right };
+    const res = stackChildren(unitChildren(id, sp), x + INDENT, y + ROW_STEP);
+    return { bottom: Math.max(res.bottom, y + NODE_HEIGHT), right: Math.max(right, res.right) };
   }
 
   // A root family: head (+ spouse) on top, generation-2 children as columns,
@@ -127,7 +167,11 @@ export function layoutTreeVertical(
   let curX = 0;
   for (const id of roots) {
     if (placed.has(id)) continue;
-    const rightExtent = placeFamily(id, curX);
+    const spouses = (spouseOf.get(id) ?? []).filter((s) => !placed.has(s));
+    // A multi-wife head uses the stacked (indented) form so wives stay separate;
+    // a single-spouse head keeps the wide gen-2 columns.
+    const rightExtent =
+      spouses.length >= 2 ? place(id, curX, 0).right : placeFamily(id, curX);
     curX = rightExtent + FAMILY_GAP;
   }
 

@@ -77,6 +77,18 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     [people],
   );
 
+  // How many spouses each person has — a 2+ count means a "vợ 2" family that the
+  // vertical layout stacks, so its marriage lines route top→bottom instead.
+  const spouseCount = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of relationships) {
+      if (r.type !== 'spouse') continue;
+      m.set(r.aId, (m.get(r.aId) ?? 0) + 1);
+      m.set(r.bId, (m.get(r.bId) ?? 0) + 1);
+    }
+    return m;
+  }, [relationships]);
+
   // Parent-pairs that are an actual married couple (have a spouse link). Only
   // these get a shared junction knot; other multi-parent children (con riêng)
   // are drawn with separate dashed lines so they don't look like a couple.
@@ -178,6 +190,32 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
       if (r.type !== 'spouse') continue;
       const aMale = genderOf.get(r.aId) === 'male';
       const bMale = genderOf.get(r.bId) === 'male';
+
+      // "Vợ 2" family: the husband (2+ spouses) sits above each wife, so route
+      // the marriage line husband-bottom → wife-top for a clean vertical branch.
+      const husbandId =
+        (spouseCount.get(r.aId) ?? 0) >= 2
+          ? r.aId
+          : (spouseCount.get(r.bId) ?? 0) >= 2
+            ? r.bId
+            : null;
+      if (husbandId) {
+        const wifeId = husbandId === r.aId ? r.bId : r.aId;
+        next.push({
+          id: r.id,
+          source: husbandId,
+          target: wifeId,
+          sourceHandle: 'bottom',
+          targetHandle: 'top',
+          type: 'smoothstep',
+          pathOptions: { borderRadius: 16 },
+          selectable: true,
+          style: { stroke: CRIMSON, strokeWidth: 2, strokeDasharray: '5 5' },
+        } as Edge);
+        continue;
+      }
+
+      // Side-by-side couple: husband (male) on the left, line runs left→right.
       let source = r.aId;
       let target = r.bId;
       if (aMale !== bMale) {
@@ -248,7 +286,7 @@ function Flow({ onEdit }: { onEdit: (id: string) => void }) {
     }
 
     setEdges(next);
-  }, [relationships, unions, isCoupleUnion, moverIds, relocatedPair, genderOf, setEdges]);
+  }, [relationships, unions, isCoupleUnion, moverIds, relocatedPair, genderOf, spouseCount, setEdges]);
 
   const doLayout = useCallback(() => {
     const positioned =

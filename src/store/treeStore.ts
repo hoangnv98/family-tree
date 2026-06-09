@@ -112,7 +112,7 @@ export const useTreeStore = create<TreeState>()(
       readOnly,
       cloudSave: 'off',
       showInLaw: true,
-      layoutMode: 'tree',
+      layoutMode: 'vertical',
       positions: {},
 
       setReadOnly: (v) => set({ readOnly: v }),
