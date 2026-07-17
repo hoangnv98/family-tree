@@ -23,7 +23,10 @@ export async function loadCloudTree(id: string): Promise<CloudLoad> {
   }
   if (res.status === 503) return { status: 'disabled' };
   if (res.status === 404) return { status: 'empty' };
-  if (!res.ok) return { status: 'error', error: `Lỗi tải (HTTP ${res.status}).` };
+  if (!res.ok) {
+    const j = await res.json().catch(() => null);
+    return { status: 'error', error: j?.error || `Lỗi tải (HTTP ${res.status}).` };
+  }
 
   const json = await res.json().catch(() => null);
   const parsed = familyTreeFileSchema.safeParse(json?.data);

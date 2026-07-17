@@ -21,6 +21,19 @@ const SLUG = /^[a-z0-9_-]{1,64}$/;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default async function handler(req: any, res: any) {
+  try {
+    return await route(req, res);
+  } catch (err) {
+    // Without this the store's error escapes the handler and Vercel turns it
+    // into a bare 500, so the browser only ever sees "HTTP 500".
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error(`[api/tree] ${req.method} id=${req.query?.id}: ${detail}`, err);
+    return res.status(500).json({ ok: false, error: `Lỗi máy chủ: ${detail}` });
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function route(req: any, res: any) {
   const id = String(req.query?.id ?? '').toLowerCase();
   if (!SLUG.test(id)) {
     return res.status(400).json({ ok: false, error: 'id không hợp lệ' });
@@ -33,8 +46,19 @@ export default async function handler(req: any, res: any) {
   const key = `tree:${id}`;
 
   if (req.method === 'GET') {
-    const data = await redis.get(key);
-    if (!data) return res.status(404).json({ ok: false, error: 'chưa có cây này' });
+    const raw = await redis.get(key);
+    if (!raw) return res.status(404).json({ ok: false, error: 'chưa có cây này' });
+    // The client auto-parses JSON, but hands back the raw string when parsing
+    // fails — retry it here so a double-encoded record still loads.
+    let data = raw;
+    if (typeof raw === 'string') {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        console.error(`[api/tree] ${key} holds unparseable data (${raw.length} chars)`);
+        return res.status(500).json({ ok: false, error: 'Dữ liệu lưu bị hỏng.' });
+      }
+    }
     return res.status(200).json({ ok: true, data });
   }
 
