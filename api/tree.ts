@@ -14,8 +14,13 @@ const SLUG = /^[a-z0-9_-]{1,64}$/;
 
 const pathFor = (id: string) => `trees/${id}.json`;
 
-// Vercel injects this when a Blob store is connected to the project.
-const hasStore = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+// A connected store authenticates one of two ways, and the SDK prefers the
+// first: OIDC (BLOB_STORE_ID here + VERCEL_OIDC_TOKEN injected at runtime, so
+// it never shows up in the dashboard's env list), or a read-write token, which
+// is what `vercel env pull` gives you locally. Checking only for the token
+// would 503 on a perfectly working OIDC deployment.
+const hasStore = () =>
+  Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default async function handler(req: any, res: any) {
