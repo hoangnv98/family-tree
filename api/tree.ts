@@ -1,23 +1,21 @@
-import { Redis } from '@upstash/redis';
+import { get, put } from '@vercel/blob';
 
 /**
  * Shared-tree storage API (Vercel serverless function).
  *   GET  /api/tree?id=<slug>  → load the stored tree JSON (404 if not created)
  *   POST /api/tree?id=<slug>  → overwrite it (last-write-wins)
  *
- * Backed by Upstash Redis / Vercel KV. If no store is provisioned the env vars
- * are absent and every call returns 503 so the front-end can fall back to the
- * bundled static trees instead of breaking.
+ * Backed by Vercel Blob. If no store is connected the token env var is absent
+ * and every call returns 503 so the front-end can fall back to the bundled
+ * static trees instead of breaking.
  */
 
-function getRedis(): Redis | null {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  return new Redis({ url, token });
-}
-
 const SLUG = /^[a-z0-9_-]{1,64}$/;
+
+const pathFor = (id: string) => `trees/${id}.json`;
+
+// Vercel injects this when a Blob store is connected to the project.
+const hasStore = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default async function handler(req: any, res: any) {
@@ -38,26 +36,26 @@ async function route(req: any, res: any) {
   if (!SLUG.test(id)) {
     return res.status(400).json({ ok: false, error: 'id không hợp lệ' });
   }
-
-  const redis = getRedis();
-  if (!redis) {
+  if (!hasStore()) {
     return res.status(503).json({ ok: false, error: 'cloud chưa bật' });
   }
-  const key = `tree:${id}`;
 
   if (req.method === 'GET') {
-    const raw = await redis.get(key);
-    if (!raw) return res.status(404).json({ ok: false, error: 'chưa có cây này' });
-    // The client auto-parses JSON, but hands back the raw string when parsing
-    // fails — retry it here so a double-encoded record still loads.
-    let data = raw;
-    if (typeof raw === 'string') {
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        console.error(`[api/tree] ${key} holds unparseable data (${raw.length} chars)`);
-        return res.status(500).json({ ok: false, error: 'Dữ liệu lưu bị hỏng.' });
-      }
+    // useCache:false reads from origin, not the CDN. Blobs are cached for a
+    // minimum of a minute, so a cached read would hand back a tree that an
+    // edit from seconds ago has already replaced.
+    const found = await get(pathFor(id), { access: 'private', useCache: false });
+    if (!found?.stream) {
+      return res.status(404).json({ ok: false, error: 'chưa có cây này' });
+    }
+    const text = await new Response(found.stream).text();
+
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error(`[api/tree] ${pathFor(id)} holds unparseable data (${text.length} chars)`);
+      return res.status(500).json({ ok: false, error: 'Dữ liệu lưu bị hỏng.' });
     }
     return res.status(200).json({ ok: true, data });
   }
@@ -74,12 +72,6 @@ async function route(req: any, res: any) {
     if (!body || !Array.isArray(body.people) || !Array.isArray(body.relationships)) {
       return res.status(400).json({ ok: false, error: 'dữ liệu cây không hợp lệ' });
     }
-    // Guard against oversized payloads (Upstash request limits); ~900KB of JSON.
-    if (JSON.stringify(body).length > 900_000) {
-      return res
-        .status(413)
-        .json({ ok: false, error: 'Cây quá lớn (ảnh nhúng?). Hãy dùng ảnh nhẹ hơn.' });
-    }
     const record = {
       version: 1,
       meta: body.meta ?? { name: 'Cây gia phả', exportedAt: new Date().toISOString() },
@@ -90,7 +82,19 @@ async function route(req: any, res: any) {
         : {}),
       updatedAt: Date.now(),
     };
-    await redis.set(key, record);
+    const json = JSON.stringify(record);
+    // The binding limit is now Vercel's ~4.5MB request body, not the store.
+    if (json.length > 4_000_000) {
+      return res
+        .status(413)
+        .json({ ok: false, error: 'Cây quá lớn (ảnh nhúng?). Hãy dùng ảnh nhẹ hơn.' });
+    }
+    await put(pathFor(id), json, {
+      access: 'private',
+      contentType: 'application/json',
+      allowOverwrite: true,
+      cacheControlMaxAge: 60, // the store's minimum; reads bypass it anyway
+    });
     return res.status(200).json({ ok: true, updatedAt: record.updatedAt });
   }
 
